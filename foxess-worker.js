@@ -289,34 +289,49 @@ export default {
       });
     }
 
-    // Debug endpoint - shows signature generation details (remove in production)
+    // Debug endpoint - tests all signature formats against real API
     if (url.pathname === '/api/debug') {
       var debugPath = '/op/v0/device/real/query';
-      var debugTimestamp = Date.now().toString();
+      var body = JSON.stringify({ sn: env.FOXESS_DEVICE_SN, variables: ['SoC'] });
+      var results = {};
 
-      // Test MD5 with known value: md5("test") = 098f6bcd4621d373cade4e832627b4f6
-      var md5Test = md5('test');
-      var md5Works = md5Test === '098f6bcd4621d373cade4e832627b4f6';
+      // Test CRLF format
+      var ts1 = Date.now().toString();
+      var sig1 = md5(debugPath + '\r\n' + env.FOXESS_API_KEY + '\r\n' + ts1);
+      try {
+        var resp1 = await fetch(FOXESS_API_BASE + debugPath, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'token': env.FOXESS_API_KEY, 'timestamp': ts1, 'signature': sig1, 'lang': 'en' },
+          body: body
+        });
+        results.CRLF = await resp1.json();
+      } catch (e) { results.CRLF = { error: e.message }; }
 
-      // Test different signature formats
-      var sig1 = md5(debugPath + '\r\n' + env.FOXESS_API_KEY + '\r\n' + debugTimestamp); // CRLF
-      var sig2 = md5(debugPath + '\n' + env.FOXESS_API_KEY + '\n' + debugTimestamp); // LF only
-      var sig3 = md5(debugPath + env.FOXESS_API_KEY + debugTimestamp); // No separator
+      // Test LF format
+      var ts2 = Date.now().toString();
+      var sig2 = md5(debugPath + '\n' + env.FOXESS_API_KEY + '\n' + ts2);
+      try {
+        var resp2 = await fetch(FOXESS_API_BASE + debugPath, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'token': env.FOXESS_API_KEY, 'timestamp': ts2, 'signature': sig2, 'lang': 'en' },
+          body: body
+        });
+        results.LF = await resp2.json();
+      } catch (e) { results.LF = { error: e.message }; }
 
-      return new Response(JSON.stringify({
-        hasApiKey: !!env.FOXESS_API_KEY,
-        apiKeyLength: env.FOXESS_API_KEY ? env.FOXESS_API_KEY.length : 0,
-        apiKeyPreview: env.FOXESS_API_KEY ? env.FOXESS_API_KEY.substring(0, 4) + '...' : null,
-        hasDeviceSN: !!env.FOXESS_DEVICE_SN,
-        deviceSNPreview: env.FOXESS_DEVICE_SN ? env.FOXESS_DEVICE_SN.substring(0, 4) + '...' : null,
-        md5Test: md5Test,
-        md5Works: md5Works,
-        path: debugPath,
-        timestamp: debugTimestamp,
-        signatureCRLF: sig1,
-        signatureLF: sig2,
-        signatureNoSep: sig3
-      }), {
+      // Test no separator
+      var ts3 = Date.now().toString();
+      var sig3 = md5(debugPath + env.FOXESS_API_KEY + ts3);
+      try {
+        var resp3 = await fetch(FOXESS_API_BASE + debugPath, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'token': env.FOXESS_API_KEY, 'timestamp': ts3, 'signature': sig3, 'lang': 'en' },
+          body: body
+        });
+        results.NoSep = await resp3.json();
+      } catch (e) { results.NoSep = { error: e.message }; }
+
+      return new Response(JSON.stringify(results, null, 2), {
         headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
       });
     }
