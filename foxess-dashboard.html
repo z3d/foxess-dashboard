@@ -1,0 +1,964 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="FoxESS">
+  <meta name="theme-color" content="#1a1a2e">
+  <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
+  <title>FoxESS Battery Monitor</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      -webkit-box-sizing: border-box;
+    }
+
+    html, body {
+      height: 100%;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+      background: -webkit-linear-gradient(315deg, #1a1a2e 0%, #16213e 100%);
+      color: #e4e4e4;
+      font-size: 16px;
+      -webkit-font-smoothing: antialiased;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    .container {
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 15px;
+      min-height: 100%;
+    }
+
+    .header {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      margin-bottom: 20px;
+      padding-bottom: 10px;
+      border-bottom: 1px solid rgba(255,255,255,0.1);
+    }
+
+    .header h1 {
+      font-size: 1.4em;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .header-buttons {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+    }
+
+    .header-buttons .btn {
+      margin-left: 10px;
+    }
+
+    .btn {
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #fff;
+      padding: 8px 12px;
+      border-radius: 8px;
+      -webkit-border-radius: 8px;
+      font-size: 0.9em;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-appearance: none;
+    }
+
+    .btn:active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .status-bar {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      font-size: 0.8em;
+      color: #888;
+      margin-bottom: 15px;
+    }
+
+    .status-indicator {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+    }
+
+    .status-dot {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      -webkit-border-radius: 50%;
+      margin-right: 6px;
+      background: #666;
+    }
+
+    .status-dot.online {
+      background: #4ade80;
+    }
+
+    .status-dot.error {
+      background: #f87171;
+    }
+
+    /* Battery Section */
+    .battery-section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      -webkit-border-radius: 16px;
+      padding: 20px;
+      margin-bottom: 15px;
+    }
+
+    .battery-container {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+    }
+
+    .battery-visual {
+      position: relative;
+      width: 80px;
+      height: 140px;
+      margin-right: 20px;
+      -webkit-flex-shrink: 0;
+      flex-shrink: 0;
+    }
+
+    .battery-body {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      width: 80px;
+      height: 130px;
+      border: 3px solid #4ade80;
+      border-radius: 8px;
+      -webkit-border-radius: 8px;
+      overflow: hidden;
+    }
+
+    .battery-cap {
+      position: absolute;
+      top: 0;
+      left: 50%;
+      margin-left: -15px;
+      width: 30px;
+      height: 8px;
+      background: #4ade80;
+      border-radius: 3px 3px 0 0;
+      -webkit-border-radius: 3px 3px 0 0;
+    }
+
+    .battery-level {
+      position: absolute;
+      bottom: 3px;
+      left: 3px;
+      right: 3px;
+      background: -webkit-linear-gradient(bottom, #4ade80, #22c55e);
+      background: linear-gradient(to top, #4ade80, #22c55e);
+      border-radius: 3px;
+      -webkit-border-radius: 3px;
+      -webkit-transition: height 0.5s ease;
+      transition: height 0.5s ease;
+    }
+
+    .battery-level.low {
+      background: -webkit-linear-gradient(bottom, #f87171, #ef4444);
+      background: linear-gradient(to top, #f87171, #ef4444);
+    }
+
+    .battery-level.medium {
+      background: -webkit-linear-gradient(bottom, #fbbf24, #f59e0b);
+      background: linear-gradient(to top, #fbbf24, #f59e0b);
+    }
+
+    .battery-info {
+      -webkit-box-flex: 1;
+      -webkit-flex: 1;
+      flex: 1;
+    }
+
+    .battery-soc {
+      font-size: 3em;
+      font-weight: 700;
+      color: #fff;
+      line-height: 1;
+    }
+
+    .battery-soc .unit {
+      font-size: 0.4em;
+      color: #888;
+    }
+
+    .battery-status {
+      font-size: 1.1em;
+      margin-top: 8px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      -webkit-border-radius: 20px;
+      display: inline-block;
+    }
+
+    .battery-status.charging {
+      background: rgba(74, 222, 128, 0.2);
+      color: #4ade80;
+    }
+
+    .battery-status.discharging {
+      background: rgba(251, 191, 36, 0.2);
+      color: #fbbf24;
+    }
+
+    .battery-status.idle {
+      background: rgba(148, 163, 184, 0.2);
+      color: #94a3b8;
+    }
+
+    .battery-details {
+      margin-top: 12px;
+      font-size: 0.9em;
+      color: #888;
+    }
+
+    /* Stats Grid */
+    .stats-grid {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-wrap: wrap;
+      flex-wrap: wrap;
+      margin: 0 -6px 15px -6px;
+    }
+
+    .stat-card {
+      width: 50%;
+      padding: 6px;
+    }
+
+    .stat-card-inner {
+      background: rgba(255,255,255,0.05);
+      border-radius: 12px;
+      -webkit-border-radius: 12px;
+      padding: 15px;
+    }
+
+    .stat-label {
+      font-size: 0.8em;
+      color: #888;
+      margin-bottom: 5px;
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+    }
+
+    .stat-icon {
+      margin-right: 6px;
+      font-size: 1.2em;
+    }
+
+    .stat-value {
+      font-size: 1.6em;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .stat-value .unit {
+      font-size: 0.5em;
+      color: #888;
+      font-weight: 400;
+    }
+
+    .stat-card.solar .stat-value {
+      color: #fbbf24;
+    }
+
+    .stat-card.load .stat-value {
+      color: #60a5fa;
+    }
+
+    .stat-card.grid-export .stat-value {
+      color: #4ade80;
+    }
+
+    .stat-card.grid-import .stat-value {
+      color: #f87171;
+    }
+
+    /* Daily Totals */
+    .daily-section {
+      background: rgba(255,255,255,0.05);
+      border-radius: 16px;
+      -webkit-border-radius: 16px;
+      padding: 15px;
+      margin-bottom: 15px;
+    }
+
+    .daily-section h2 {
+      font-size: 1em;
+      font-weight: 500;
+      color: #888;
+      margin-bottom: 12px;
+    }
+
+    .daily-grid {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-flex-wrap: wrap;
+      flex-wrap: wrap;
+      margin: 0 -4px;
+    }
+
+    .daily-item {
+      width: 33.333%;
+      padding: 4px;
+    }
+
+    .daily-item-inner {
+      text-align: center;
+      padding: 10px 5px;
+      background: rgba(255,255,255,0.03);
+      border-radius: 8px;
+      -webkit-border-radius: 8px;
+    }
+
+    .daily-value {
+      font-size: 1.2em;
+      font-weight: 600;
+      color: #fff;
+    }
+
+    .daily-label {
+      font-size: 0.7em;
+      color: #666;
+      margin-top: 4px;
+    }
+
+    /* Settings Panel */
+    .settings-overlay {
+      display: none;
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      bottom: 0;
+      background: rgba(0,0,0,0.8);
+      z-index: 100;
+    }
+
+    .settings-overlay.active {
+      display: block;
+    }
+
+    .settings-panel {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: #1e1e2e;
+      border-radius: 20px 20px 0 0;
+      -webkit-border-radius: 20px 20px 0 0;
+      padding: 20px;
+      max-height: 80%;
+      overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+
+    .settings-header {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      margin-bottom: 20px;
+    }
+
+    .settings-header h2 {
+      font-size: 1.2em;
+      color: #fff;
+    }
+
+    .settings-close {
+      background: none;
+      border: none;
+      color: #888;
+      font-size: 1.5em;
+      cursor: pointer;
+      padding: 5px;
+      -webkit-appearance: none;
+    }
+
+    .settings-group {
+      margin-bottom: 20px;
+    }
+
+    .settings-group label {
+      display: block;
+      font-size: 0.9em;
+      color: #888;
+      margin-bottom: 8px;
+    }
+
+    .settings-group input {
+      width: 100%;
+      padding: 12px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.1);
+      border-radius: 8px;
+      -webkit-border-radius: 8px;
+      color: #fff;
+      font-size: 1em;
+      -webkit-appearance: none;
+    }
+
+    .settings-group input:focus {
+      outline: none;
+      border-color: #4ade80;
+    }
+
+    .settings-save {
+      width: 100%;
+      padding: 14px;
+      background: #4ade80;
+      border: none;
+      border-radius: 10px;
+      -webkit-border-radius: 10px;
+      color: #000;
+      font-size: 1em;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-appearance: none;
+    }
+
+    .settings-save:active {
+      background: #22c55e;
+    }
+
+    /* Error State */
+    .error-message {
+      background: rgba(248, 113, 113, 0.1);
+      border: 1px solid rgba(248, 113, 113, 0.3);
+      border-radius: 12px;
+      -webkit-border-radius: 12px;
+      padding: 15px;
+      margin-bottom: 15px;
+      color: #f87171;
+      text-align: center;
+    }
+
+    /* Loading State */
+    .loading .battery-visual {
+      opacity: 0.5;
+    }
+
+    /* No config state */
+    .no-config {
+      text-align: center;
+      padding: 40px 20px;
+    }
+
+    .no-config h2 {
+      color: #fff;
+      margin-bottom: 15px;
+    }
+
+    .no-config p {
+      color: #888;
+      margin-bottom: 20px;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>FoxESS Monitor</h1>
+      <div class="header-buttons">
+        <button class="btn" id="refreshBtn">Refresh</button>
+        <button class="btn" id="settingsBtn">Settings</button>
+      </div>
+    </div>
+
+    <div class="status-bar">
+      <div class="status-indicator">
+        <span class="status-dot" id="statusDot"></span>
+        <span id="statusText">Connecting...</span>
+      </div>
+      <div id="lastUpdate">--</div>
+    </div>
+
+    <div id="noConfig" class="no-config" style="display: none;">
+      <h2>Welcome</h2>
+      <p>Configure your Worker URL in settings to get started.</p>
+      <button class="btn" id="openSettingsBtn">Open Settings</button>
+    </div>
+
+    <div id="errorMessage" class="error-message" style="display: none;"></div>
+
+    <div id="dashboard">
+      <!-- Battery Section -->
+      <div class="battery-section">
+        <div class="battery-container">
+          <div class="battery-visual">
+            <div class="battery-cap"></div>
+            <div class="battery-body">
+              <div class="battery-level" id="batteryLevel" style="height: 0%;"></div>
+            </div>
+          </div>
+          <div class="battery-info">
+            <div class="battery-soc"><span id="socValue">--</span><span class="unit">%</span></div>
+            <div class="battery-status idle" id="batteryStatus">Loading...</div>
+            <div class="battery-details" id="batteryDetails">--</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Stats Grid -->
+      <div class="stats-grid">
+        <div class="stat-card solar">
+          <div class="stat-card-inner">
+            <div class="stat-label"><span class="stat-icon">&#9788;</span> Solar</div>
+            <div class="stat-value"><span id="solarPower">--</span> <span class="unit">kW</span></div>
+          </div>
+        </div>
+        <div class="stat-card load">
+          <div class="stat-card-inner">
+            <div class="stat-label"><span class="stat-icon">&#9889;</span> Home Load</div>
+            <div class="stat-value"><span id="loadPower">--</span> <span class="unit">kW</span></div>
+          </div>
+        </div>
+        <div class="stat-card grid-export">
+          <div class="stat-card-inner">
+            <div class="stat-label"><span class="stat-icon">&#8593;</span> Grid Export</div>
+            <div class="stat-value"><span id="gridExport">--</span> <span class="unit">kW</span></div>
+          </div>
+        </div>
+        <div class="stat-card grid-import">
+          <div class="stat-card-inner">
+            <div class="stat-label"><span class="stat-icon">&#8595;</span> Grid Import</div>
+            <div class="stat-value"><span id="gridImport">--</span> <span class="unit">kW</span></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Daily Totals -->
+      <div class="daily-section">
+        <h2>Today's Energy</h2>
+        <div class="daily-grid">
+          <div class="daily-item">
+            <div class="daily-item-inner">
+              <div class="daily-value" id="dailySolar">--</div>
+              <div class="daily-label">Solar kWh</div>
+            </div>
+          </div>
+          <div class="daily-item">
+            <div class="daily-item-inner">
+              <div class="daily-value" id="dailyExport">--</div>
+              <div class="daily-label">Export kWh</div>
+            </div>
+          </div>
+          <div class="daily-item">
+            <div class="daily-item-inner">
+              <div class="daily-value" id="dailyImport">--</div>
+              <div class="daily-label">Import kWh</div>
+            </div>
+          </div>
+          <div class="daily-item">
+            <div class="daily-item-inner">
+              <div class="daily-value" id="dailyCharge">--</div>
+              <div class="daily-label">Charge kWh</div>
+            </div>
+          </div>
+          <div class="daily-item">
+            <div class="daily-item-inner">
+              <div class="daily-value" id="dailyDischarge">--</div>
+              <div class="daily-label">Discharge kWh</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Settings Overlay -->
+  <div class="settings-overlay" id="settingsOverlay">
+    <div class="settings-panel">
+      <div class="settings-header">
+        <h2>Settings</h2>
+        <button class="settings-close" id="settingsClose">x</button>
+      </div>
+      <div class="settings-group">
+        <label for="workerUrl">Worker URL</label>
+        <input type="url" id="workerUrl" placeholder="https://your-worker.workers.dev">
+      </div>
+      <div class="settings-group">
+        <label for="refreshInterval">Refresh Interval (seconds)</label>
+        <input type="number" id="refreshInterval" value="30" min="10" max="300">
+      </div>
+      <button class="settings-save" id="settingsSave">Save Settings</button>
+    </div>
+  </div>
+
+  <script>
+    (function() {
+      'use strict';
+
+      var config = {
+        workerUrl: '',
+        refreshInterval: 30
+      };
+
+      var refreshTimer = null;
+      var elements = {};
+
+      function initElements() {
+        elements.statusDot = document.getElementById('statusDot');
+        elements.statusText = document.getElementById('statusText');
+        elements.lastUpdate = document.getElementById('lastUpdate');
+        elements.noConfig = document.getElementById('noConfig');
+        elements.errorMessage = document.getElementById('errorMessage');
+        elements.dashboard = document.getElementById('dashboard');
+        elements.batteryLevel = document.getElementById('batteryLevel');
+        elements.socValue = document.getElementById('socValue');
+        elements.batteryStatus = document.getElementById('batteryStatus');
+        elements.batteryDetails = document.getElementById('batteryDetails');
+        elements.solarPower = document.getElementById('solarPower');
+        elements.loadPower = document.getElementById('loadPower');
+        elements.gridExport = document.getElementById('gridExport');
+        elements.gridImport = document.getElementById('gridImport');
+        elements.dailySolar = document.getElementById('dailySolar');
+        elements.dailyExport = document.getElementById('dailyExport');
+        elements.dailyImport = document.getElementById('dailyImport');
+        elements.dailyCharge = document.getElementById('dailyCharge');
+        elements.dailyDischarge = document.getElementById('dailyDischarge');
+        elements.settingsOverlay = document.getElementById('settingsOverlay');
+        elements.workerUrl = document.getElementById('workerUrl');
+        elements.refreshInterval = document.getElementById('refreshInterval');
+      }
+
+      function loadConfig() {
+        try {
+          var saved = localStorage.getItem('foxess_config');
+          if (saved) {
+            var parsed = JSON.parse(saved);
+            config.workerUrl = parsed.workerUrl || '';
+            config.refreshInterval = parsed.refreshInterval || 30;
+          }
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+
+      function saveConfig() {
+        try {
+          localStorage.setItem('foxess_config', JSON.stringify(config));
+        } catch (e) {
+          // Ignore errors
+        }
+      }
+
+      function formatNumber(value, decimals) {
+        if (value === null || value === undefined || isNaN(value)) {
+          return '--';
+        }
+        var d = decimals !== undefined ? decimals : 1;
+        return Number(value).toFixed(d);
+      }
+
+      function formatTime(date) {
+        var hours = date.getHours();
+        var minutes = date.getMinutes();
+        var seconds = date.getSeconds();
+        var hh = hours < 10 ? '0' + hours : '' + hours;
+        var mm = minutes < 10 ? '0' + minutes : '' + minutes;
+        var ss = seconds < 10 ? '0' + seconds : '' + seconds;
+        return hh + ':' + mm + ':' + ss;
+      }
+
+      function getVarValue(result, varName) {
+        if (!result || !result.result) return null;
+        var resultArr = result.result;
+        if (!resultArr[0] || !resultArr[0].datas) return null;
+        var datas = resultArr[0].datas;
+        for (var i = 0; i < datas.length; i++) {
+          if (datas[i].variable === varName) {
+            return datas[i].value;
+          }
+        }
+        return null;
+      }
+
+      function getReportValue(result, varName) {
+        if (!result || !result.result) return null;
+        var resultArr = result.result;
+        if (!resultArr[0] || !resultArr[0].values) return null;
+        var values = resultArr[0].values;
+        for (var i = 0; i < values.length; i++) {
+          if (values[i].variable === varName && values[i].data) {
+            var total = 0;
+            var data = values[i].data;
+            for (var j = 0; j < data.length; j++) {
+              var val = data[j];
+              if (val !== null && !isNaN(val)) {
+                total += val;
+              }
+            }
+            return total;
+          }
+        }
+        return null;
+      }
+
+      function setStatus(status, message) {
+        elements.statusDot.className = 'status-dot ' + status;
+        elements.statusText.textContent = message;
+      }
+
+      function showError(message) {
+        elements.errorMessage.textContent = message;
+        elements.errorMessage.style.display = 'block';
+        setStatus('error', 'Error');
+      }
+
+      function hideError() {
+        elements.errorMessage.style.display = 'none';
+      }
+
+      function updateRealtimeData(data) {
+        if (data.errno !== 0) {
+          var msg = data.msg || 'Unknown error';
+          showError('API Error: ' + msg);
+          return;
+        }
+
+        hideError();
+        setStatus('online', 'Connected');
+        elements.lastUpdate.textContent = formatTime(new Date());
+
+        var soc = getVarValue(data, 'SoC');
+        if (soc !== null) {
+          elements.socValue.textContent = Math.round(soc);
+          var levelHeight = Math.max(0, Math.min(100, soc));
+          elements.batteryLevel.style.height = levelHeight + '%';
+
+          elements.batteryLevel.className = 'battery-level';
+          if (soc < 20) {
+            elements.batteryLevel.className = 'battery-level low';
+          } else if (soc < 50) {
+            elements.batteryLevel.className = 'battery-level medium';
+          }
+        }
+
+        var chargePower = getVarValue(data, 'batChargePower');
+        var dischargePower = getVarValue(data, 'batDischargePower');
+        var batTemp = getVarValue(data, 'batTemperature');
+
+        chargePower = chargePower || 0;
+        dischargePower = dischargePower || 0;
+
+        elements.batteryStatus.className = 'battery-status';
+        if (chargePower > 0.05) {
+          elements.batteryStatus.className = 'battery-status charging';
+          elements.batteryStatus.textContent = 'Charging ' + formatNumber(chargePower, 2) + ' kW';
+        } else if (dischargePower > 0.05) {
+          elements.batteryStatus.className = 'battery-status discharging';
+          elements.batteryStatus.textContent = 'Discharging ' + formatNumber(dischargePower, 2) + ' kW';
+        } else {
+          elements.batteryStatus.className = 'battery-status idle';
+          elements.batteryStatus.textContent = 'Idle';
+        }
+
+        var details = [];
+        if (batTemp !== null) {
+          details.push(formatNumber(batTemp, 1) + ' C');
+        }
+        var rVolt = getVarValue(data, 'RVolt');
+        if (rVolt !== null) {
+          details.push(formatNumber(rVolt, 0) + ' V');
+        }
+        elements.batteryDetails.textContent = details.length > 0 ? details.join(' | ') : '--';
+
+        var pvPower = getVarValue(data, 'pvPower');
+        var loadsPower = getVarValue(data, 'loadsPower');
+        var feedinPower = getVarValue(data, 'feedinPower');
+        var gridConsumption = getVarValue(data, 'gridConsumptionPower');
+
+        elements.solarPower.textContent = formatNumber(pvPower, 2);
+        elements.loadPower.textContent = formatNumber(loadsPower, 2);
+        elements.gridExport.textContent = formatNumber(feedinPower, 2);
+        elements.gridImport.textContent = formatNumber(gridConsumption, 2);
+      }
+
+      function updateReportData(data) {
+        if (data.errno !== 0) {
+          return;
+        }
+
+        var generation = getReportValue(data, 'generation');
+        var feedin = getReportValue(data, 'feedin');
+        var gridConsumption = getReportValue(data, 'gridConsumption');
+        var charge = getReportValue(data, 'chargeEnergyToTal');
+        var discharge = getReportValue(data, 'dischargeEnergyToTal');
+
+        elements.dailySolar.textContent = formatNumber(generation, 1);
+        elements.dailyExport.textContent = formatNumber(feedin, 1);
+        elements.dailyImport.textContent = formatNumber(gridConsumption, 1);
+        elements.dailyCharge.textContent = formatNumber(charge, 1);
+        elements.dailyDischarge.textContent = formatNumber(discharge, 1);
+      }
+
+      function fetchData() {
+        if (!config.workerUrl) {
+          elements.noConfig.style.display = 'block';
+          elements.dashboard.style.display = 'none';
+          setStatus('', 'Not configured');
+          return;
+        }
+
+        elements.noConfig.style.display = 'none';
+        elements.dashboard.style.display = 'block';
+        setStatus('', 'Updating...');
+
+        var xhr1 = new XMLHttpRequest();
+        xhr1.open('POST', config.workerUrl + '/api/realtime', true);
+        xhr1.setRequestHeader('Content-Type', 'application/json');
+        xhr1.onreadystatechange = function() {
+          if (xhr1.readyState === 4) {
+            if (xhr1.status === 200) {
+              try {
+                var data = JSON.parse(xhr1.responseText);
+                updateRealtimeData(data);
+              } catch (e) {
+                showError('Failed to parse response');
+              }
+            } else {
+              showError('Connection failed (' + xhr1.status + ')');
+            }
+          }
+        };
+        xhr1.onerror = function() {
+          showError('Network error');
+        };
+        xhr1.send('{}');
+
+        var xhr2 = new XMLHttpRequest();
+        xhr2.open('POST', config.workerUrl + '/api/report?type=day', true);
+        xhr2.setRequestHeader('Content-Type', 'application/json');
+        xhr2.onreadystatechange = function() {
+          if (xhr2.readyState === 4 && xhr2.status === 200) {
+            try {
+              var data = JSON.parse(xhr2.responseText);
+              updateReportData(data);
+            } catch (e) {
+              // Ignore
+            }
+          }
+        };
+        xhr2.send('{}');
+      }
+
+      function startAutoRefresh() {
+        if (refreshTimer) {
+          clearInterval(refreshTimer);
+        }
+        var interval = Math.max(10, config.refreshInterval) * 1000;
+        refreshTimer = setInterval(fetchData, interval);
+      }
+
+      function openSettings() {
+        elements.workerUrl.value = config.workerUrl;
+        elements.refreshInterval.value = config.refreshInterval;
+        elements.settingsOverlay.className = 'settings-overlay active';
+      }
+
+      function closeSettings() {
+        elements.settingsOverlay.className = 'settings-overlay';
+      }
+
+      function initSettings() {
+        var settingsBtn = document.getElementById('settingsBtn');
+        var settingsClose = document.getElementById('settingsClose');
+        var settingsSave = document.getElementById('settingsSave');
+        var openSettingsBtn = document.getElementById('openSettingsBtn');
+        var refreshBtn = document.getElementById('refreshBtn');
+
+        settingsBtn.onclick = openSettings;
+        if (openSettingsBtn) {
+          openSettingsBtn.onclick = openSettings;
+        }
+        settingsClose.onclick = closeSettings;
+
+        settingsSave.onclick = function() {
+          var url = elements.workerUrl.value;
+          if (url && url.charAt(url.length - 1) === '/') {
+            url = url.substring(0, url.length - 1);
+          }
+          config.workerUrl = url;
+          config.refreshInterval = parseInt(elements.refreshInterval.value, 10) || 30;
+          saveConfig();
+          closeSettings();
+          fetchData();
+          startAutoRefresh();
+        };
+
+        refreshBtn.onclick = function() {
+          fetchData();
+        };
+
+        elements.settingsOverlay.onclick = function(e) {
+          if (e.target === elements.settingsOverlay) {
+            closeSettings();
+          }
+        };
+      }
+
+      function init() {
+        initElements();
+        loadConfig();
+        initSettings();
+        fetchData();
+        startAutoRefresh();
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init, false);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>
