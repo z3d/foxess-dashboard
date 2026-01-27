@@ -289,6 +289,28 @@ export default {
       });
     }
 
+    // Debug endpoint - shows signature generation details (remove in production)
+    if (url.pathname === '/api/debug') {
+      var debugPath = '/op/v0/device/real/query';
+      var debugTimestamp = Date.now().toString();
+      var debugSignature = generateSignature(debugPath, env.FOXESS_API_KEY, debugTimestamp);
+      var debugSignatureString = debugPath + '\\r\\n' + env.FOXESS_API_KEY + '\\r\\n' + debugTimestamp;
+
+      return new Response(JSON.stringify({
+        hasApiKey: !!env.FOXESS_API_KEY,
+        apiKeyLength: env.FOXESS_API_KEY ? env.FOXESS_API_KEY.length : 0,
+        apiKeyPreview: env.FOXESS_API_KEY ? env.FOXESS_API_KEY.substring(0, 4) + '...' : null,
+        hasDeviceSN: !!env.FOXESS_DEVICE_SN,
+        deviceSNPreview: env.FOXESS_DEVICE_SN ? env.FOXESS_DEVICE_SN.substring(0, 4) + '...' : null,
+        path: debugPath,
+        timestamp: debugTimestamp,
+        signature: debugSignature,
+        signatureInputPreview: debugSignatureString.substring(0, 50) + '...'
+      }), {
+        headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
+      });
+    }
+
     // Real-time data endpoint
     if (url.pathname === '/api/realtime') {
       try {
