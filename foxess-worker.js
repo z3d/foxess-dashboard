@@ -293,8 +293,15 @@ export default {
     if (url.pathname === '/api/debug') {
       var debugPath = '/op/v0/device/real/query';
       var debugTimestamp = Date.now().toString();
-      var debugSignature = generateSignature(debugPath, env.FOXESS_API_KEY, debugTimestamp);
-      var debugSignatureString = debugPath + '\\r\\n' + env.FOXESS_API_KEY + '\\r\\n' + debugTimestamp;
+
+      // Test MD5 with known value: md5("test") = 098f6bcd4621d373cade4e832627b4f6
+      var md5Test = md5('test');
+      var md5Works = md5Test === '098f6bcd4621d373cade4e832627b4f6';
+
+      // Test different signature formats
+      var sig1 = md5(debugPath + '\r\n' + env.FOXESS_API_KEY + '\r\n' + debugTimestamp); // CRLF
+      var sig2 = md5(debugPath + '\n' + env.FOXESS_API_KEY + '\n' + debugTimestamp); // LF only
+      var sig3 = md5(debugPath + env.FOXESS_API_KEY + debugTimestamp); // No separator
 
       return new Response(JSON.stringify({
         hasApiKey: !!env.FOXESS_API_KEY,
@@ -302,10 +309,13 @@ export default {
         apiKeyPreview: env.FOXESS_API_KEY ? env.FOXESS_API_KEY.substring(0, 4) + '...' : null,
         hasDeviceSN: !!env.FOXESS_DEVICE_SN,
         deviceSNPreview: env.FOXESS_DEVICE_SN ? env.FOXESS_DEVICE_SN.substring(0, 4) + '...' : null,
+        md5Test: md5Test,
+        md5Works: md5Works,
         path: debugPath,
         timestamp: debugTimestamp,
-        signature: debugSignature,
-        signatureInputPreview: debugSignatureString.substring(0, 50) + '...'
+        signatureCRLF: sig1,
+        signatureLF: sig2,
+        signatureNoSep: sig3
       }), {
         headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
       });
