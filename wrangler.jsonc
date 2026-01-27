@@ -1,0 +1,5 @@
+{
+  "name": "foxess-dashboard",
+  "compatibility_date": "2026-01-27",
+  "main": "foxess-worker.js"
+}
