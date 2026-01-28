@@ -292,57 +292,58 @@ export default {
     // Debug endpoint - tests signature formats against real API
     if (url.pathname === '/api/debug') {
       var debugPath = '/op/v0/device/real/query';
+      var pathNoSlash = 'op/v0/device/real/query';
       var body = JSON.stringify({ sn: env.FOXESS_DEVICE_SN, variables: ['SoC'] });
-      var results = {};
+      var results = { hasDeviceSN: !!env.FOXESS_DEVICE_SN };
 
-      // Test 1: Milliseconds timestamp with CRLF (current)
+      // Test 1: Path without leading slash
       var ts1 = Date.now().toString();
-      var sig1 = md5(debugPath + '\r\n' + env.FOXESS_API_KEY + '\r\n' + ts1);
+      var sig1 = md5(pathNoSlash + '\r\n' + env.FOXESS_API_KEY + '\r\n' + ts1);
       try {
         var resp1 = await fetch(FOXESS_API_BASE + debugPath, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'token': env.FOXESS_API_KEY, 'timestamp': ts1, 'signature': sig1, 'lang': 'en' },
           body: body
         });
-        results.msWithCRLF = await resp1.json();
-      } catch (e) { results.msWithCRLF = { error: e.message }; }
+        results.noLeadingSlash = await resp1.json();
+      } catch (e) { results.noLeadingSlash = { error: e.message }; }
 
-      // Test 2: Seconds timestamp with CRLF
-      var ts2 = Math.floor(Date.now() / 1000).toString();
-      var sig2 = md5(debugPath + '\r\n' + env.FOXESS_API_KEY + '\r\n' + ts2);
+      // Test 2: Full URL in signature
+      var ts2 = Date.now().toString();
+      var fullUrl = 'https://www.foxesscloud.com/op/v0/device/real/query';
+      var sig2 = md5(fullUrl + '\r\n' + env.FOXESS_API_KEY + '\r\n' + ts2);
       try {
         var resp2 = await fetch(FOXESS_API_BASE + debugPath, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', 'token': env.FOXESS_API_KEY, 'timestamp': ts2, 'signature': sig2, 'lang': 'en' },
           body: body
         });
-        results.secWithCRLF = await resp2.json();
-      } catch (e) { results.secWithCRLF = { error: e.message }; }
+        results.fullUrl = await resp2.json();
+      } catch (e) { results.fullUrl = { error: e.message }; }
 
-      // Test 3: Milliseconds with lowercase API key
+      // Test 3: Original with leading slash (baseline)
       var ts3 = Date.now().toString();
-      var lowerKey = env.FOXESS_API_KEY.toLowerCase();
-      var sig3 = md5(debugPath + '\r\n' + lowerKey + '\r\n' + ts3);
+      var sig3 = md5(debugPath + '\r\n' + env.FOXESS_API_KEY + '\r\n' + ts3);
       try {
         var resp3 = await fetch(FOXESS_API_BASE + debugPath, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'token': lowerKey, 'timestamp': ts3, 'signature': sig3, 'lang': 'en' },
+          headers: { 'Content-Type': 'application/json', 'token': env.FOXESS_API_KEY, 'timestamp': ts3, 'signature': sig3, 'lang': 'en' },
           body: body
         });
-        results.msLowerKey = await resp3.json();
-      } catch (e) { results.msLowerKey = { error: e.message }; }
+        results.withLeadingSlash = await resp3.json();
+      } catch (e) { results.withLeadingSlash = { error: e.message }; }
 
-      // Test 4: With 'Api-Key' header instead of 'token'
+      // Test 4: Different order in signature: token + path + timestamp
       var ts4 = Date.now().toString();
-      var sig4 = md5(debugPath + '\r\n' + env.FOXESS_API_KEY + '\r\n' + ts4);
+      var sig4 = md5(env.FOXESS_API_KEY + '\r\n' + debugPath + '\r\n' + ts4);
       try {
         var resp4 = await fetch(FOXESS_API_BASE + debugPath, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'Api-Key': env.FOXESS_API_KEY, 'token': env.FOXESS_API_KEY, 'timestamp': ts4, 'signature': sig4, 'lang': 'en' },
+          headers: { 'Content-Type': 'application/json', 'token': env.FOXESS_API_KEY, 'timestamp': ts4, 'signature': sig4, 'lang': 'en' },
           body: body
         });
-        results.withApiKeyHeader = await resp4.json();
-      } catch (e) { results.withApiKeyHeader = { error: e.message }; }
+        results.tokenFirst = await resp4.json();
+      } catch (e) { results.tokenFirst = { error: e.message }; }
 
       return new Response(JSON.stringify(results, null, 2), {
         headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
