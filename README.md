@@ -66,6 +66,7 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
    ```bash
    wrangler secret put FOXESS_API_KEY
    wrangler secret put FOXESS_DEVICE_SN
+   wrangler secret put API_KEY  # Required for authentication
    ```
 
 7. Deploy:
@@ -88,7 +89,8 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
    - `FOXESS_API_KEY`: Your FoxESS API key
    - `FOXESS_DEVICE_SN`: Your inverter serial number
    - `ALLOWED_ORIGIN`: `*` (or your dashboard URL for security)
-9. Click **Encrypt** for `FOXESS_API_KEY` to protect it
+   - `API_KEY`: A secret key to authenticate requests to your worker (required)
+9. Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them
 10. Note your worker URL from the dashboard
 
 ### 3. Host the Dashboard
@@ -117,8 +119,10 @@ Simply open `foxess-dashboard.html` in a browser. Note: Some features may be lim
 1. Open your hosted dashboard URL
 2. Click **Settings**
 3. Enter your Worker URL (e.g., `https://foxess-api.your-subdomain.workers.dev`)
-4. Set your preferred refresh interval (default: 60 seconds)
-5. Click **Save Settings**
+4. Enter your API Key (the same value you set in the worker's `API_KEY` environment variable)
+5. Set your preferred refresh interval (default: 60 seconds)
+6. Optionally update your latitude/longitude for weather data
+7. Click **Save Settings**
 
 ### 5. Add to iPad Home Screen
 
@@ -129,15 +133,34 @@ Simply open `foxess-dashboard.html` in a browser. Note: Some features may be lim
 5. Name it "FoxESS" and tap **Add**
 6. Open from your home screen for a full-screen experience
 
+## API Authentication
+
+To prevent inadvertent calls from third parties, the API requires authentication:
+
+1. Set the `API_KEY` environment variable in your Cloudflare Worker (required)
+2. Clients must include the `X-API-Key` header with matching value
+3. The `/api/health` endpoint is always public (no authentication required)
+4. All other endpoints require valid authentication
+
+### Example authenticated request:
+
+```bash
+curl -H "X-API-Key: your-secret-key" https://your-worker.workers.dev/api/realtime
+```
+
+### Dashboard configuration:
+
+The dashboard includes an API Key field in settings. Enter the same API key you configured in your worker's environment variables.
+
 ## API Endpoints
 
 The worker exposes these endpoints:
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/api/health` | GET | Health check |
-| `/api/realtime` | POST | Real-time inverter data |
-| `/api/report?type=day` | POST | Daily energy report |
+| Endpoint | Method | Description | Auth Required |
+|----------|--------|-------------|---------------|
+| `/api/health` | GET | Health check | No |
+| `/api/realtime` | POST | Real-time inverter data | Yes |
+| `/api/report?type=day` | POST | Daily energy report | Yes |
 
 ## Troubleshooting
 
@@ -168,10 +191,13 @@ https://www.foxesscloud.com/public/i18n/en/OpenApiDocument.html
 
 ## Security Notes
 
-- Store your API key as an encrypted secret in Cloudflare
-- Consider setting `ALLOWED_ORIGIN` to your specific dashboard URL
-- The worker acts as a proxy, keeping your API key server-side
-- Never expose your API key in client-side code
+- Store your FoxESS API key as an encrypted secret in Cloudflare
+- Set the `API_KEY` environment variable to protect your worker endpoints
+- Consider setting `ALLOWED_ORIGIN` to your specific dashboard URL instead of `*`
+- The worker acts as a proxy, keeping your FoxESS API key server-side
+- Never expose your API keys in client-side code
+- For production use, combine `API_KEY` authentication with restricted CORS origins
+- Use a strong, unique value for your `API_KEY` (e.g., generate with `openssl rand -hex 32`)
 
 ## License
 

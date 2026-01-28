@@ -5,6 +5,7 @@
  * - FOXESS_API_KEY: Your FoxESS API key
  * - FOXESS_DEVICE_SN: Your inverter serial number
  * - ALLOWED_ORIGIN: Allowed origin for CORS (e.g., https://yourdomain.com or *)
+ * - API_KEY: Your API key for authenticating requests to the worker
  */
 
 const FOXESS_API_BASE = 'https://www.foxesscloud.com';
@@ -187,9 +188,15 @@ function corsHeaders(origin, allowedOrigin) {
   return {
     'Access-Control-Allow-Origin': allowed ? (allowedOrigin === '*' ? '*' : origin) : '',
     'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, X-API-Key',
     'Access-Control-Max-Age': '86400'
   };
+}
+
+// Validate API key
+function validateApiKey(request, env) {
+  var providedKey = request.headers.get('X-API-Key');
+  return providedKey && providedKey === env.API_KEY;
 }
 
 // Fetch real-time data from FoxESS
@@ -283,9 +290,17 @@ export default {
       return new Response(null, { headers: cors });
     }
 
-    // Health check endpoint
+    // Health check endpoint (no auth required)
     if (url.pathname === '/api/health') {
       return new Response(JSON.stringify({ status: 'ok', timestamp: Date.now() }), {
+        headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
+      });
+    }
+
+    // Validate API key for protected endpoints
+    if (!validateApiKey(request, env)) {
+      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
+        status: 401,
         headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
       });
     }

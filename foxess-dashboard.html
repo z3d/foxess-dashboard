@@ -588,6 +588,10 @@
         <input type="url" id="workerUrl" placeholder="https://your-worker.workers.dev">
       </div>
       <div class="settings-group">
+        <label for="apiKey">API Key</label>
+        <input type="password" id="apiKey" placeholder="Your API key">
+      </div>
+      <div class="settings-group">
         <label for="refreshInterval">Refresh Interval (seconds)</label>
         <input type="number" id="refreshInterval" value="60" min="10" max="300">
       </div>
@@ -609,6 +613,7 @@
 
       var config = {
         workerUrl: '',
+        apiKey: '',
         refreshInterval: 60,
         latitude: -27.47,
         longitude: 153.02
@@ -637,6 +642,7 @@
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
         elements.settingsOverlay = document.getElementById('settingsOverlay');
         elements.workerUrl = document.getElementById('workerUrl');
+        elements.apiKey = document.getElementById('apiKey');
         elements.refreshInterval = document.getElementById('refreshInterval');
         elements.latitude = document.getElementById('latitude');
         elements.longitude = document.getElementById('longitude');
@@ -648,6 +654,7 @@
           if (saved) {
             var parsed = JSON.parse(saved);
             config.workerUrl = parsed.workerUrl || '';
+            config.apiKey = parsed.apiKey || '';
             config.refreshInterval = parsed.refreshInterval || 60;
             config.latitude = parsed.latitude || -27.47;
             config.longitude = parsed.longitude || 153.02;
@@ -824,6 +831,9 @@
         var xhr1 = new XMLHttpRequest();
         xhr1.open('POST', config.workerUrl + '/api/realtime', true);
         xhr1.setRequestHeader('Content-Type', 'application/json');
+        if (config.apiKey) {
+          xhr1.setRequestHeader('X-API-Key', config.apiKey);
+        }
         xhr1.onreadystatechange = function() {
           if (xhr1.readyState === 4) {
             if (xhr1.status === 200) {
@@ -860,6 +870,7 @@
 
       function openSettings() {
         elements.workerUrl.value = config.workerUrl;
+        elements.apiKey.value = config.apiKey;
         elements.refreshInterval.value = config.refreshInterval;
         elements.latitude.value = config.latitude;
         elements.longitude.value = config.longitude;
@@ -889,6 +900,7 @@
             url = url.substring(0, url.length - 1);
           }
           config.workerUrl = url;
+          config.apiKey = elements.apiKey.value;
           config.refreshInterval = parseInt(elements.refreshInterval.value, 10) || 60;
           config.latitude = parseFloat(elements.latitude.value) || -27.47;
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
