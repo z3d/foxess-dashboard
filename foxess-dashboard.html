@@ -314,25 +314,6 @@
       color: #f87171;
     }
 
-    /* Temperature and Voltage cards */
-    .stat-card.temp {
-      background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%);
-      background: -webkit-linear-gradient(315deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%);
-    }
-
-    .stat-card.temp .stat-value {
-      color: #fb923c;
-    }
-
-    .stat-card.voltage {
-      background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
-      background: -webkit-linear-gradient(315deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
-    }
-
-    .stat-card.voltage .stat-value {
-      color: #a855f7;
-    }
-
     /* Settings Panel */
     .settings-overlay {
       display: none;
@@ -542,22 +523,6 @@
           </div>
         </div>
       </div>
-
-      <!-- Additional Stats -->
-      <div class="stats-grid">
-        <div class="stat-card temp">
-          <div class="stat-card-inner">
-            <div class="stat-label"><span class="stat-icon">&#127777;</span> Battery Temp</div>
-            <div class="stat-value"><span id="batTemp">--</span> <span class="unit">°C</span></div>
-          </div>
-        </div>
-        <div class="stat-card voltage">
-          <div class="stat-card-inner">
-            <div class="stat-label"><span class="stat-icon">&#9889;</span> Grid Voltage</div>
-            <div class="stat-value"><span id="gridVoltage">--</span> <span class="unit">V</span></div>
-          </div>
-        </div>
-      </div>
     </div>
   </div>
 
@@ -607,8 +572,6 @@
         elements.loadPower = document.getElementById('loadPower');
         elements.gridExport = document.getElementById('gridExport');
         elements.gridImport = document.getElementById('gridImport');
-        elements.batTemp = document.getElementById('batTemp');
-        elements.gridVoltage = document.getElementById('gridVoltage');
         elements.settingsOverlay = document.getElementById('settingsOverlay');
         elements.workerUrl = document.getElementById('workerUrl');
         elements.refreshInterval = document.getElementById('refreshInterval');
@@ -744,8 +707,6 @@
         elements.loadPower.textContent = formatNumber(loadsPower, 2);
         elements.gridExport.textContent = formatNumber(feedinPower, 2);
         elements.gridImport.textContent = formatNumber(gridConsumption, 2);
-        elements.batTemp.textContent = formatNumber(batTemp, 1);
-        elements.gridVoltage.textContent = formatNumber(rVolt, 0);
       }
 
       function fetchData() {
