@@ -292,38 +292,73 @@ export default {
     // Debug endpoint - try device list which doesn't need SN
     if (url.pathname === '/api/debug') {
       var listPath = '/op/v0/device/list';
+      // Trim whitespace from API key just in case
+      var apiKey = (env.FOXESS_API_KEY || '').trim();
       var results = {
-        hasApiKey: !!env.FOXESS_API_KEY,
-        apiKeyLength: env.FOXESS_API_KEY ? env.FOXESS_API_KEY.length : 0,
+        hasApiKey: !!apiKey,
+        apiKeyLength: apiKey.length,
+        apiKeyFirstChar: apiKey.charCodeAt(0),
+        apiKeyLastChar: apiKey.charCodeAt(apiKey.length - 1),
         hasDeviceSN: !!env.FOXESS_DEVICE_SN
       };
 
-      // Test device list endpoint (simpler, no SN needed)
-      var ts1 = Date.now().toString();
-      var sig1 = md5(listPath + '\r\n' + env.FOXESS_API_KEY + '\r\n' + ts1);
       var body1 = JSON.stringify({ currentPage: 1, pageSize: 10 });
+
+      // Test 1: Lowercase signature (current)
+      var ts1 = Date.now().toString();
+      var sig1 = md5(listPath + '\r\n' + apiKey + '\r\n' + ts1);
       try {
         var resp1 = await fetch(FOXESS_API_BASE + listPath, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            'token': env.FOXESS_API_KEY,
+            'token': apiKey,
             'timestamp': ts1,
             'signature': sig1,
+            'lang': 'en',
+            'User-Agent': 'Mozilla/5.0'
+          },
+          body: body1
+        });
+        results.lowercase = await resp1.json();
+      } catch (e) { results.lowercase = { error: e.message }; }
+
+      // Test 2: Uppercase signature
+      var ts2 = Date.now().toString();
+      var sig2 = md5(listPath + '\r\n' + apiKey + '\r\n' + ts2).toUpperCase();
+      try {
+        var resp2 = await fetch(FOXESS_API_BASE + listPath, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'token': apiKey,
+            'timestamp': ts2,
+            'signature': sig2,
             'lang': 'en'
           },
           body: body1
         });
-        results.deviceList = await resp1.json();
-      } catch (e) { results.deviceList = { error: e.message }; }
+        results.uppercase = await resp2.json();
+      } catch (e) { results.uppercase = { error: e.message }; }
 
-      // Also show what we're sending for manual verification
-      results.debug = {
-        path: listPath,
-        timestamp: ts1,
-        signature: sig1,
-        signatureInput: listPath + '\\r\\n' + env.FOXESS_API_KEY.substring(0,8) + '...\\r\\n' + ts1
-      };
+      // Test 3: Try /c/v0/ path instead of /op/v0/
+      var altPath = '/c/v0/device/list';
+      var ts3 = Date.now().toString();
+      var sig3 = md5(altPath + '\r\n' + apiKey + '\r\n' + ts3);
+      try {
+        var resp3 = await fetch(FOXESS_API_BASE + altPath, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'token': apiKey,
+            'timestamp': ts3,
+            'signature': sig3,
+            'lang': 'en'
+          },
+          body: body1
+        });
+        results.altPath = await resp3.json();
+      } catch (e) { results.altPath = { error: e.message }; }
 
       return new Response(JSON.stringify(results, null, 2), {
         headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
