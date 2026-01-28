@@ -45,13 +45,29 @@
       -webkit-box-align: center;
       -webkit-align-items: center;
       align-items: center;
-      margin-bottom: 20px;
+      margin-bottom: 15px;
       padding-bottom: 10px;
       border-bottom: 1px solid rgba(255,255,255,0.1);
     }
 
+    .header-left {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+    }
+
     .header h1 {
-      font-size: 1.4em;
+      font-size: 0.8em;
+      font-weight: 500;
+      color: #888;
+      margin-right: 15px;
+    }
+
+    .header-time {
+      font-size: 2.5em;
       font-weight: 600;
       color: #fff;
     }
@@ -83,21 +99,6 @@
       background: rgba(255,255,255,0.2);
     }
 
-    .status-bar {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-box-pack: justify;
-      -webkit-justify-content: space-between;
-      justify-content: space-between;
-      -webkit-box-align: center;
-      -webkit-align-items: center;
-      align-items: center;
-      font-size: 0.8em;
-      color: #888;
-      margin-bottom: 15px;
-    }
-
     .status-indicator {
       display: -webkit-box;
       display: -webkit-flex;
@@ -105,6 +106,8 @@
       -webkit-box-align: center;
       -webkit-align-items: center;
       align-items: center;
+      font-size: 0.6em;
+      color: #888;
     }
 
     .status-dot {
@@ -132,6 +135,15 @@
       -webkit-border-radius: 16px;
       padding: 20px;
       margin-bottom: 15px;
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
     }
 
     .battery-container {
@@ -141,6 +153,38 @@
       -webkit-box-align: center;
       -webkit-align-items: center;
       align-items: center;
+    }
+
+    .weather-panel {
+      text-align: right;
+      padding-left: 20px;
+    }
+
+    .weather-temp {
+      font-size: 3em;
+      font-weight: 700;
+      color: #60a5fa;
+      line-height: 1;
+    }
+
+    .weather-temp .unit {
+      font-size: 0.4em;
+      color: #888;
+    }
+
+    .weather-details {
+      margin-top: 10px;
+    }
+
+    .weather-item {
+      font-size: 0.9em;
+      color: #ccc;
+      margin-top: 4px;
+    }
+
+    .weather-label {
+      color: #888;
+      margin-right: 8px;
     }
 
     .battery-visual {
@@ -455,19 +499,18 @@
 <body>
   <div class="container">
     <div class="header">
-      <h1>FoxESS Monitor</h1>
+      <div class="header-left">
+        <h1>FoxESS</h1>
+        <div class="status-indicator">
+          <span class="status-dot" id="statusDot"></span>
+          <span id="statusText">Connecting...</span>
+        </div>
+      </div>
+      <div class="header-time" id="currentTime">--:--</div>
       <div class="header-buttons">
         <button class="btn" id="refreshBtn">Refresh</button>
         <button class="btn" id="settingsBtn">Settings</button>
       </div>
-    </div>
-
-    <div class="status-bar">
-      <div class="status-indicator">
-        <span class="status-dot" id="statusDot"></span>
-        <span id="statusText">Connecting...</span>
-      </div>
-      <div id="lastUpdate">--</div>
     </div>
 
     <div id="noConfig" class="no-config" style="display: none;">
@@ -479,7 +522,7 @@
     <div id="errorMessage" class="error-message" style="display: none;"></div>
 
     <div id="dashboard">
-      <!-- Battery Section -->
+      <!-- Battery and Weather Section -->
       <div class="battery-section">
         <div class="battery-container">
           <div class="battery-visual">
@@ -492,6 +535,13 @@
             <div class="battery-soc"><span id="socValue">--</span><span class="unit">%</span></div>
             <div class="battery-status idle" id="batteryStatus">Loading...</div>
             <div class="battery-details" id="batteryDetails">--</div>
+          </div>
+        </div>
+        <div class="weather-panel">
+          <div class="weather-temp"><span id="weatherTemp">--</span><span class="unit">°C</span></div>
+          <div class="weather-details">
+            <div class="weather-item"><span class="weather-label">Humidity</span><span id="weatherHumidity">--</span>%</div>
+            <div class="weather-item"><span class="weather-label">Dew Point</span><span id="weatherDewpoint">--</span>°C</div>
           </div>
         </div>
       </div>
@@ -541,6 +591,14 @@
         <label for="refreshInterval">Refresh Interval (seconds)</label>
         <input type="number" id="refreshInterval" value="60" min="10" max="300">
       </div>
+      <div class="settings-group">
+        <label for="latitude">Latitude</label>
+        <input type="text" id="latitude" placeholder="-27.47">
+      </div>
+      <div class="settings-group">
+        <label for="longitude">Longitude</label>
+        <input type="text" id="longitude" placeholder="153.02">
+      </div>
       <button class="settings-save" id="settingsSave">Save Settings</button>
     </div>
   </div>
@@ -551,7 +609,9 @@
 
       var config = {
         workerUrl: '',
-        refreshInterval: 60
+        refreshInterval: 60,
+        latitude: -27.47,
+        longitude: 153.02
       };
 
       var refreshTimer = null;
@@ -560,7 +620,7 @@
       function initElements() {
         elements.statusDot = document.getElementById('statusDot');
         elements.statusText = document.getElementById('statusText');
-        elements.lastUpdate = document.getElementById('lastUpdate');
+        elements.currentTime = document.getElementById('currentTime');
         elements.noConfig = document.getElementById('noConfig');
         elements.errorMessage = document.getElementById('errorMessage');
         elements.dashboard = document.getElementById('dashboard');
@@ -572,9 +632,14 @@
         elements.loadPower = document.getElementById('loadPower');
         elements.gridExport = document.getElementById('gridExport');
         elements.gridImport = document.getElementById('gridImport');
+        elements.weatherTemp = document.getElementById('weatherTemp');
+        elements.weatherHumidity = document.getElementById('weatherHumidity');
+        elements.weatherDewpoint = document.getElementById('weatherDewpoint');
         elements.settingsOverlay = document.getElementById('settingsOverlay');
         elements.workerUrl = document.getElementById('workerUrl');
         elements.refreshInterval = document.getElementById('refreshInterval');
+        elements.latitude = document.getElementById('latitude');
+        elements.longitude = document.getElementById('longitude');
       }
 
       function loadConfig() {
@@ -584,6 +649,8 @@
             var parsed = JSON.parse(saved);
             config.workerUrl = parsed.workerUrl || '';
             config.refreshInterval = parsed.refreshInterval || 60;
+            config.latitude = parsed.latitude || -27.47;
+            config.longitude = parsed.longitude || 153.02;
           }
         } catch (e) {
           // Ignore errors
@@ -596,6 +663,39 @@
         } catch (e) {
           // Ignore errors
         }
+      }
+
+      function updateClock() {
+        var now = new Date();
+        var hours = now.getHours();
+        var minutes = now.getMinutes();
+        var hh = hours < 10 ? '0' + hours : '' + hours;
+        var mm = minutes < 10 ? '0' + minutes : '' + minutes;
+        elements.currentTime.textContent = hh + ':' + mm;
+      }
+
+      function fetchWeather() {
+        var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + config.latitude +
+                  '&longitude=' + config.longitude +
+                  '&current=temperature_2m,relative_humidity_2m,dew_point_2m';
+
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+              var data = JSON.parse(xhr.responseText);
+              if (data.current) {
+                elements.weatherTemp.textContent = Math.round(data.current.temperature_2m);
+                elements.weatherHumidity.textContent = Math.round(data.current.relative_humidity_2m);
+                elements.weatherDewpoint.textContent = Math.round(data.current.dew_point_2m);
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        };
+        xhr.send();
       }
 
       function formatNumber(value, decimals) {
@@ -755,6 +855,8 @@
       function openSettings() {
         elements.workerUrl.value = config.workerUrl;
         elements.refreshInterval.value = config.refreshInterval;
+        elements.latitude.value = config.latitude;
+        elements.longitude.value = config.longitude;
         elements.settingsOverlay.className = 'settings-overlay active';
       }
 
@@ -782,9 +884,12 @@
           }
           config.workerUrl = url;
           config.refreshInterval = parseInt(elements.refreshInterval.value, 10) || 60;
+          config.latitude = parseFloat(elements.latitude.value) || -27.47;
+          config.longitude = parseFloat(elements.longitude.value) || 153.02;
           saveConfig();
           closeSettings();
           fetchData();
+          fetchWeather();
           startAutoRefresh();
         };
 
@@ -805,6 +910,10 @@
         initSettings();
         fetchData();
         startAutoRefresh();
+        updateClock();
+        setInterval(updateClock, 1000);
+        fetchWeather();
+        setInterval(fetchWeather, 600000); // Update weather every 10 minutes
       }
 
       if (document.readyState === 'loading') {
