@@ -6,10 +6,10 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 
 - Real-time battery state of charge (SOC) with visual indicator
 - Charging/discharging/idle status with power display
+- Battery temperature and grid voltage
 - Solar generation power
 - Home load consumption
 - Grid import/export
-- Daily energy totals
 - Dark theme optimized for always-on displays
 - "Add to Home Screen" support for iPad/iPhone
 - Configurable refresh interval
@@ -117,7 +117,7 @@ Simply open `foxess-dashboard.html` in a browser. Note: Some features may be lim
 1. Open your hosted dashboard URL
 2. Click **Settings**
 3. Enter your Worker URL (e.g., `https://foxess-api.your-subdomain.workers.dev`)
-4. Set your preferred refresh interval (default: 30 seconds)
+4. Set your preferred refresh interval (default: 60 seconds)
 5. Click **Save Settings**
 
 ### 5. Add to iPad Home Screen
