@@ -831,10 +831,12 @@
                 var data = JSON.parse(xhr1.responseText);
                 updateRealtimeData(data);
               } catch (e) {
-                showError('Failed to parse response');
+                showError('Parse error: ' + xhr1.responseText.substring(0, 50));
               }
+            } else if (xhr1.status === 0) {
+              showError('CORS or network error');
             } else {
-              showError('Connection failed (' + xhr1.status + ')');
+              showError('Error ' + xhr1.status);
             }
           }
         };
