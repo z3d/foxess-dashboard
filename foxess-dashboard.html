@@ -829,9 +829,13 @@
             if (xhr1.status === 200) {
               try {
                 var data = JSON.parse(xhr1.responseText);
-                updateRealtimeData(data);
+                try {
+                  updateRealtimeData(data);
+                } catch (e2) {
+                  showError('Update error: ' + e2.message);
+                }
               } catch (e) {
-                showError('Parse error: ' + xhr1.responseText.substring(0, 50));
+                showError('JSON error: ' + e.message);
               }
             } else if (xhr1.status === 0) {
               showError('CORS or network error');
