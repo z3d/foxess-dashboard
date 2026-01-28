@@ -314,54 +314,23 @@
       color: #f87171;
     }
 
-    /* Daily Totals */
-    .daily-section {
-      background: rgba(255,255,255,0.05);
-      border-radius: 16px;
-      -webkit-border-radius: 16px;
-      padding: 15px;
-      margin-bottom: 15px;
+    /* Temperature and Voltage cards */
+    .stat-card.temp {
+      background: linear-gradient(135deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%);
+      background: -webkit-linear-gradient(315deg, rgba(251, 146, 60, 0.2) 0%, rgba(251, 146, 60, 0.1) 100%);
     }
 
-    .daily-section h2 {
-      font-size: 1em;
-      font-weight: 500;
-      color: #888;
-      margin-bottom: 12px;
+    .stat-card.temp .stat-value {
+      color: #fb923c;
     }
 
-    .daily-grid {
-      display: -webkit-box;
-      display: -webkit-flex;
-      display: flex;
-      -webkit-flex-wrap: wrap;
-      flex-wrap: wrap;
-      margin: 0 -4px;
+    .stat-card.voltage {
+      background: linear-gradient(135deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
+      background: -webkit-linear-gradient(315deg, rgba(168, 85, 247, 0.2) 0%, rgba(168, 85, 247, 0.1) 100%);
     }
 
-    .daily-item {
-      width: 33.333%;
-      padding: 4px;
-    }
-
-    .daily-item-inner {
-      text-align: center;
-      padding: 10px 5px;
-      background: rgba(255,255,255,0.03);
-      border-radius: 8px;
-      -webkit-border-radius: 8px;
-    }
-
-    .daily-value {
-      font-size: 1.2em;
-      font-weight: 600;
-      color: #fff;
-    }
-
-    .daily-label {
-      font-size: 0.7em;
-      color: #666;
-      margin-top: 4px;
+    .stat-card.voltage .stat-value {
+      color: #a855f7;
     }
 
     /* Settings Panel */
@@ -574,39 +543,18 @@
         </div>
       </div>
 
-      <!-- Daily Totals -->
-      <div class="daily-section">
-        <h2>Today's Energy</h2>
-        <div class="daily-grid">
-          <div class="daily-item">
-            <div class="daily-item-inner">
-              <div class="daily-value" id="dailySolar">--</div>
-              <div class="daily-label">Solar kWh</div>
-            </div>
+      <!-- Additional Stats -->
+      <div class="stats-grid">
+        <div class="stat-card temp">
+          <div class="stat-card-inner">
+            <div class="stat-label"><span class="stat-icon">&#127777;</span> Battery Temp</div>
+            <div class="stat-value"><span id="batTemp">--</span> <span class="unit">°C</span></div>
           </div>
-          <div class="daily-item">
-            <div class="daily-item-inner">
-              <div class="daily-value" id="dailyExport">--</div>
-              <div class="daily-label">Export kWh</div>
-            </div>
-          </div>
-          <div class="daily-item">
-            <div class="daily-item-inner">
-              <div class="daily-value" id="dailyImport">--</div>
-              <div class="daily-label">Import kWh</div>
-            </div>
-          </div>
-          <div class="daily-item">
-            <div class="daily-item-inner">
-              <div class="daily-value" id="dailyCharge">--</div>
-              <div class="daily-label">Charge kWh</div>
-            </div>
-          </div>
-          <div class="daily-item">
-            <div class="daily-item-inner">
-              <div class="daily-value" id="dailyDischarge">--</div>
-              <div class="daily-label">Discharge kWh</div>
-            </div>
+        </div>
+        <div class="stat-card voltage">
+          <div class="stat-card-inner">
+            <div class="stat-label"><span class="stat-icon">&#9889;</span> Grid Voltage</div>
+            <div class="stat-value"><span id="gridVoltage">--</span> <span class="unit">V</span></div>
           </div>
         </div>
       </div>
@@ -659,11 +607,8 @@
         elements.loadPower = document.getElementById('loadPower');
         elements.gridExport = document.getElementById('gridExport');
         elements.gridImport = document.getElementById('gridImport');
-        elements.dailySolar = document.getElementById('dailySolar');
-        elements.dailyExport = document.getElementById('dailyExport');
-        elements.dailyImport = document.getElementById('dailyImport');
-        elements.dailyCharge = document.getElementById('dailyCharge');
-        elements.dailyDischarge = document.getElementById('dailyDischarge');
+        elements.batTemp = document.getElementById('batTemp');
+        elements.gridVoltage = document.getElementById('gridVoltage');
         elements.settingsOverlay = document.getElementById('settingsOverlay');
         elements.workerUrl = document.getElementById('workerUrl');
         elements.refreshInterval = document.getElementById('refreshInterval');
@@ -716,27 +661,6 @@
         for (var i = 0; i < datas.length; i++) {
           if (datas[i].variable === varName) {
             return datas[i].value;
-          }
-        }
-        return null;
-      }
-
-      function getReportValue(result, varName) {
-        if (!result || !result.result) return null;
-        var resultArr = result.result;
-        if (!resultArr[0] || !resultArr[0].values) return null;
-        var values = resultArr[0].values;
-        for (var i = 0; i < values.length; i++) {
-          if (values[i].variable === varName && values[i].data) {
-            var total = 0;
-            var data = values[i].data;
-            for (var j = 0; j < data.length; j++) {
-              var val = data[j];
-              if (val !== null && !isNaN(val)) {
-                total += val;
-              }
-            }
-            return total;
           }
         }
         return null;
@@ -820,24 +744,8 @@
         elements.loadPower.textContent = formatNumber(loadsPower, 2);
         elements.gridExport.textContent = formatNumber(feedinPower, 2);
         elements.gridImport.textContent = formatNumber(gridConsumption, 2);
-      }
-
-      function updateReportData(data) {
-        if (data.errno !== 0) {
-          return;
-        }
-
-        var generation = getReportValue(data, 'generation');
-        var feedin = getReportValue(data, 'feedin');
-        var gridConsumption = getReportValue(data, 'gridConsumption');
-        var charge = getReportValue(data, 'chargeEnergyToTal');
-        var discharge = getReportValue(data, 'dischargeEnergyToTal');
-
-        elements.dailySolar.textContent = formatNumber(generation, 1);
-        elements.dailyExport.textContent = formatNumber(feedin, 1);
-        elements.dailyImport.textContent = formatNumber(gridConsumption, 1);
-        elements.dailyCharge.textContent = formatNumber(charge, 1);
-        elements.dailyDischarge.textContent = formatNumber(discharge, 1);
+        elements.batTemp.textContent = formatNumber(batTemp, 1);
+        elements.gridVoltage.textContent = formatNumber(rVolt, 0);
       }
 
       function fetchData() {
@@ -873,21 +781,6 @@
           showError('Network error');
         };
         xhr1.send('{}');
-
-        var xhr2 = new XMLHttpRequest();
-        xhr2.open('POST', config.workerUrl + '/api/report?type=day', true);
-        xhr2.setRequestHeader('Content-Type', 'application/json');
-        xhr2.onreadystatechange = function() {
-          if (xhr2.readyState === 4 && xhr2.status === 200) {
-            try {
-              var data = JSON.parse(xhr2.responseText);
-              updateReportData(data);
-            } catch (e) {
-              // Ignore
-            }
-          }
-        };
-        xhr2.send('{}');
       }
 
       function startAutoRefresh() {
