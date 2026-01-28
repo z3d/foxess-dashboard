@@ -289,76 +289,50 @@ export default {
       });
     }
 
-    // Debug endpoint - try device list which doesn't need SN
+    // Debug endpoint - show exact signature for manual verification
     if (url.pathname === '/api/debug') {
       var listPath = '/op/v0/device/list';
-      // Trim whitespace from API key just in case
       var apiKey = (env.FOXESS_API_KEY || '').trim();
+      var ts = Date.now().toString();
+      var sigInput = listPath + '\r\n' + apiKey + '\r\n' + ts;
+      var sig = md5(sigInput);
+
+      // Test known MD5 values to verify implementation
+      var test1 = md5('hello');  // should be 5d41402abc4b2a76b9719d911017c592
+      var test2 = md5('test\r\nvalue\r\n123'); // test with CRLF
+
       var results = {
-        hasApiKey: !!apiKey,
-        apiKeyLength: apiKey.length,
-        apiKeyFirstChar: apiKey.charCodeAt(0),
-        apiKeyLastChar: apiKey.charCodeAt(apiKey.length - 1),
-        hasDeviceSN: !!env.FOXESS_DEVICE_SN
+        md5Tests: {
+          helloHash: test1,
+          helloCorrect: test1 === '5d41402abc4b2a76b9719d911017c592',
+          crlfTest: test2
+        },
+        signatureDetails: {
+          path: listPath,
+          apiKeyPreview: apiKey.substring(0, 8) + '...' + apiKey.substring(apiKey.length - 4),
+          timestamp: ts,
+          signature: sig,
+          // Show the raw string for manual MD5 verification (mask most of API key)
+          rawInputForVerify: listPath + '\\r\\n' + apiKey.substring(0,8) + '****' + apiKey.substring(apiKey.length-4) + '\\r\\n' + ts
+        }
       };
 
-      var body1 = JSON.stringify({ currentPage: 1, pageSize: 10 });
-
-      // Test 1: Lowercase signature (current)
-      var ts1 = Date.now().toString();
-      var sig1 = md5(listPath + '\r\n' + apiKey + '\r\n' + ts1);
+      // Make API call
+      var body = JSON.stringify({ currentPage: 1, pageSize: 10 });
       try {
-        var resp1 = await fetch(FOXESS_API_BASE + listPath, {
+        var resp = await fetch(FOXESS_API_BASE + listPath, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
             'token': apiKey,
-            'timestamp': ts1,
-            'signature': sig1,
-            'lang': 'en',
-            'User-Agent': 'Mozilla/5.0'
-          },
-          body: body1
-        });
-        results.lowercase = await resp1.json();
-      } catch (e) { results.lowercase = { error: e.message }; }
-
-      // Test 2: Uppercase signature
-      var ts2 = Date.now().toString();
-      var sig2 = md5(listPath + '\r\n' + apiKey + '\r\n' + ts2).toUpperCase();
-      try {
-        var resp2 = await fetch(FOXESS_API_BASE + listPath, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'token': apiKey,
-            'timestamp': ts2,
-            'signature': sig2,
+            'timestamp': ts,
+            'signature': sig,
             'lang': 'en'
           },
-          body: body1
+          body: body
         });
-        results.uppercase = await resp2.json();
-      } catch (e) { results.uppercase = { error: e.message }; }
-
-      // Test 3: Try /c/v0/ path instead of /op/v0/
-      var altPath = '/c/v0/device/list';
-      var ts3 = Date.now().toString();
-      var sig3 = md5(altPath + '\r\n' + apiKey + '\r\n' + ts3);
-      try {
-        var resp3 = await fetch(FOXESS_API_BASE + altPath, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'token': apiKey,
-            'timestamp': ts3,
-            'signature': sig3,
-            'lang': 'en'
-          },
-          body: body1
-        });
-        results.altPath = await resp3.json();
-      } catch (e) { results.altPath = { error: e.message }; }
+        results.apiResponse = await resp.json();
+      } catch (e) { results.apiResponse = { error: e.message }; }
 
       return new Response(JSON.stringify(results, null, 2), {
         headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
