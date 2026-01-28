@@ -289,70 +289,67 @@ export default {
       });
     }
 
-    // Debug endpoint - test both signature formats
+    // Debug endpoint - test literal \r\n vs actual CRLF
     if (url.pathname === '/api/debug') {
       var listPath = '/op/v0/device/list';
       var apiKey = (env.FOXESS_API_KEY || '').trim();
       var lang = 'en';
-      var ts = Date.now().toString();
       var body = JSON.stringify({ currentPage: 1, pageSize: 10 });
       var results = {};
 
-      // Test 1: Old format (3 parts): path + token + timestamp
-      var sig1 = md5(listPath + '\r\n' + apiKey + '\r\n' + ts);
+      // Test 1: Literal \r\n characters (as in Python raw f-string)
+      var ts1 = Date.now().toString();
+      var sig1 = md5(listPath + '\\r\\n' + apiKey + '\\r\\n' + lang + '\\r\\n' + ts1);
       try {
         var resp1 = await fetch(FOXESS_API_BASE + listPath, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json',
+            'Content-Type': 'application/json;charset=UTF-8',
             'token': apiKey,
-            'timestamp': ts,
+            'timestamp': ts1,
             'signature': sig1,
             'lang': lang
           },
           body: body
         });
-        results.format3parts = await resp1.json();
-      } catch (e) { results.format3parts = { error: e.message }; }
+        results.literal4parts = await resp1.json();
+      } catch (e) { results.literal4parts = { error: e.message }; }
 
-      // Test 2: New format (4 parts): path + token + lang + timestamp
+      // Test 2: Literal \r\n with 3 parts (path + token + timestamp)
       var ts2 = Date.now().toString();
-      var sig2 = md5(listPath + '\r\n' + apiKey + '\r\n' + lang + '\r\n' + ts2);
+      var sig2 = md5(listPath + '\\r\\n' + apiKey + '\\r\\n' + ts2);
       try {
         var resp2 = await fetch(FOXESS_API_BASE + listPath, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json;charset=UTF-8',
-            'Token': apiKey,
-            'Timestamp': ts2,
-            'Signature': sig2,
-            'Lang': lang,
-            'User-Agent': 'Mozilla/5.0',
-            'Timezone': 'Europe/London'
+            'Content-Type': 'application/json',
+            'token': apiKey,
+            'timestamp': ts2,
+            'signature': sig2,
+            'lang': lang
           },
           body: body
         });
-        results.format4parts = await resp2.json();
-      } catch (e) { results.format4parts = { error: e.message }; }
+        results.literal3parts = await resp2.json();
+      } catch (e) { results.literal3parts = { error: e.message }; }
 
-      // Test 3: 4 parts with lowercase headers
+      // Test 3: Actual CRLF (what we were doing)
       var ts3 = Date.now().toString();
-      var sig3 = md5(listPath + '\r\n' + apiKey + '\r\n' + lang + '\r\n' + ts3);
+      var sig3 = md5(listPath + '\r\n' + apiKey + '\r\n' + ts3);
       try {
         var resp3 = await fetch(FOXESS_API_BASE + listPath, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json;charset=UTF-8',
+            'Content-Type': 'application/json',
             'token': apiKey,
             'timestamp': ts3,
             'signature': sig3,
-            'lang': lang,
-            'timezone': 'Europe/London'
+            'lang': lang
           },
           body: body
         });
-        results.format4partsLower = await resp3.json();
-      } catch (e) { results.format4partsLower = { error: e.message }; }
+        results.actualCRLF = await resp3.json();
+      } catch (e) { results.actualCRLF = { error: e.message }; }
 
       return new Response(JSON.stringify(results, null, 2), {
         headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
