@@ -7,6 +7,7 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
+  <meta name="app-version" content="1.0.0">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -525,6 +526,71 @@
       background: #22c55e;
     }
 
+    .settings-reload {
+      width: 100%;
+      padding: 12px;
+      background: rgba(255,255,255,0.1);
+      border: 1px solid rgba(255,255,255,0.2);
+      border-radius: 10px;
+      -webkit-border-radius: 10px;
+      color: #888;
+      font-size: 0.9em;
+      cursor: pointer;
+      -webkit-appearance: none;
+      margin-top: 12px;
+    }
+
+    .settings-reload:active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .settings-version {
+      text-align: center;
+      font-size: 0.7em;
+      color: #555;
+      margin-top: 15px;
+    }
+
+    .update-banner {
+      background: rgba(251, 191, 36, 0.2);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 12px;
+      -webkit-border-radius: 12px;
+      padding: 12px 15px;
+      margin-bottom: 15px;
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-pack: justify;
+      -webkit-justify-content: space-between;
+      justify-content: space-between;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+    }
+
+    .update-banner.hidden {
+      display: none;
+    }
+
+    .update-text {
+      color: #fbbf24;
+      font-size: 0.8em;
+    }
+
+    .update-btn {
+      background: #fbbf24;
+      border: none;
+      color: #000;
+      padding: 6px 12px;
+      border-radius: 6px;
+      -webkit-border-radius: 6px;
+      font-size: 0.8em;
+      font-weight: 600;
+      cursor: pointer;
+      -webkit-appearance: none;
+    }
+
     /* Error State */
     .error-message {
       background: rgba(248, 113, 113, 0.1);
@@ -574,6 +640,11 @@
         <button class="btn" id="refreshBtn">Refresh</button>
         <button class="btn" id="settingsBtn">Settings</button>
       </div>
+    </div>
+
+    <div id="updateBanner" class="update-banner hidden">
+      <span class="update-text">Update available</span>
+      <button class="update-btn" id="updateBtn">Reload</button>
     </div>
 
     <div id="noConfig" class="no-config" style="display: none;">
@@ -684,12 +755,18 @@
         </label>
       </div>
       <button class="settings-save" id="settingsSave">Save Settings</button>
+      <button class="settings-reload" id="settingsReload">Force Reload App</button>
+      <div class="settings-version" id="settingsVersion">v1.0.0</div>
     </div>
   </div>
 
   <script>
     (function() {
       'use strict';
+
+      // Get app version from meta tag
+      var versionMeta = document.querySelector('meta[name="app-version"]');
+      var APP_VERSION = versionMeta ? versionMeta.getAttribute('content') : '1.0.0';
 
       var config = {
         workerUrl: '',
@@ -762,6 +839,33 @@
         } catch (e) {
           // Ignore errors
         }
+      }
+
+      function forceReload() {
+        // Clear caches if available
+        if ('caches' in window) {
+          caches.keys().then(function(names) {
+            names.forEach(function(name) {
+              caches.delete(name);
+            });
+          });
+        }
+        // Reload with cache busting
+        var url = window.location.href.split('?')[0];
+        window.location.href = url + '?v=' + Date.now();
+      }
+
+      function checkForUpdates() {
+        var storedVersion = localStorage.getItem('foxess_app_version');
+        if (storedVersion && storedVersion !== APP_VERSION) {
+          // New version available
+          var banner = document.getElementById('updateBanner');
+          if (banner) {
+            banner.className = 'update-banner';
+          }
+        }
+        // Store current version
+        localStorage.setItem('foxess_app_version', APP_VERSION);
       }
 
       function updateClock() {
@@ -1049,8 +1153,16 @@
         var settingsBtn = document.getElementById('settingsBtn');
         var settingsClose = document.getElementById('settingsClose');
         var settingsSave = document.getElementById('settingsSave');
+        var settingsReload = document.getElementById('settingsReload');
+        var settingsVersion = document.getElementById('settingsVersion');
         var openSettingsBtn = document.getElementById('openSettingsBtn');
         var refreshBtn = document.getElementById('refreshBtn');
+        var updateBtn = document.getElementById('updateBtn');
+
+        // Set version display
+        if (settingsVersion) {
+          settingsVersion.textContent = 'v' + APP_VERSION;
+        }
 
         settingsBtn.onclick = openSettings;
         if (openSettingsBtn) {
@@ -1083,6 +1195,14 @@
           fetchData();
         };
 
+        if (settingsReload) {
+          settingsReload.onclick = forceReload;
+        }
+
+        if (updateBtn) {
+          updateBtn.onclick = forceReload;
+        }
+
         elements.settingsOverlay.onclick = function(e) {
           if (e.target === elements.settingsOverlay) {
             closeSettings();
@@ -1093,6 +1213,7 @@
       function init() {
         initElements();
         loadConfig();
+        checkForUpdates();
         updateWeatherVisibility();
         initSettings();
         fetchData();
