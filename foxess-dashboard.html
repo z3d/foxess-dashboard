@@ -195,7 +195,12 @@
       display: inline;
     }
 
-    .dewpoint-comfort {
+    .dewpoint-emoji {
+      display: inline;
+      margin-left: 4px;
+    }
+
+    .dewpoint-label {
       display: block;
       font-size: 0.75em;
       margin-top: 2px;
@@ -582,8 +587,8 @@
           <div class="weather-details">
             <div class="weather-item"><span class="weather-label">Humidity</span><span id="weatherHumidity">--</span>%</div>
             <div class="weather-item">
-              <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--</span>°C<br>
-              <span class="dewpoint-comfort" id="dewpointComfort"></span>
+              <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--</span>°C<span class="dewpoint-emoji" id="dewpointEmoji"></span>
+              <span class="dewpoint-label" id="dewpointLabel"></span>
             </div>
           </div>
         </div>
@@ -691,7 +696,8 @@
         elements.weatherTemp = document.getElementById('weatherTemp');
         elements.weatherHumidity = document.getElementById('weatherHumidity');
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
-        elements.dewpointComfort = document.getElementById('dewpointComfort');
+        elements.dewpointEmoji = document.getElementById('dewpointEmoji');
+        elements.dewpointLabel = document.getElementById('dewpointLabel');
         elements.settingsOverlay = document.getElementById('settingsOverlay');
         elements.workerUrl = document.getElementById('workerUrl');
         elements.apiKey = document.getElementById('apiKey');
@@ -773,8 +779,10 @@
 
                 elements.weatherDewpoint.textContent = dewpoint;
                 elements.weatherDewpoint.className = 'dewpoint-value ' + comfort.class;
-                elements.dewpointComfort.className = 'dewpoint-comfort ' + comfort.class;
-                elements.dewpointComfort.textContent = comfort.emoji + ' ' + comfort.label;
+                elements.dewpointEmoji.textContent = comfort.emoji;
+                elements.dewpointEmoji.className = 'dewpoint-emoji ' + comfort.class;
+                elements.dewpointLabel.textContent = comfort.label;
+                elements.dewpointLabel.className = 'dewpoint-label ' + comfort.class;
               }
             } catch (e) {
               // Ignore errors
