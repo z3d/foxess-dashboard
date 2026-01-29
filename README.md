@@ -6,12 +6,17 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 
 - Real-time battery state of charge (SOC) with visual indicator
 - Charging/discharging/idle status with power display
+- Time to full charge / time to reserve estimates with expected completion time
+- Configurable battery size and reserve percentage
 - Battery temperature and grid voltage
 - Solar generation power
 - Home load consumption
 - Grid import/export
+- Weather panel with current conditions emoji, temperature, humidity, and dew point comfort indicator
+- 12-hour (AM/PM) or 24-hour clock format
 - Dark theme optimized for always-on displays
 - "Add to Home Screen" support for iPad/iPhone
+- Auto-update detection with Force Reload option
 - Configurable refresh interval
 
 ## Prerequisites
@@ -122,7 +127,13 @@ Simply open `foxess-dashboard.html` in a browser. Note: Some features may be lim
 4. Enter your API Key (the same value you set in the worker's `API_KEY` environment variable)
 5. Set your preferred refresh interval (default: 60 seconds)
 6. Optionally update your latitude/longitude for weather data
-7. Click **Save Settings**
+7. Configure battery settings:
+   - **Battery Size**: Your battery capacity in kWh (default: 41)
+   - **Battery Reserve**: Minimum charge percentage to maintain (default: 10%)
+8. Toggle options:
+   - **Show Weather Panel**: Display weather information (default: on)
+   - **Use 24-hour Clock**: Switch between 12h AM/PM and 24h format (default: 12h)
+9. Click **Save Settings**
 
 ### 5. Add to iPad Home Screen
 
