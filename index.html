@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.0.3">
+  <meta name="app-version" content="1.0.4">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -177,6 +177,12 @@
     .weather-temp .unit {
       font-size: 0.4em;
       color: #888;
+    }
+
+    .weather-condition {
+      font-size: 0.7em;
+      margin-right: 4px;
+      vertical-align: middle;
     }
 
     .weather-details {
@@ -675,7 +681,7 @@
           </div>
         </div>
         <div class="weather-panel" id="weatherPanel">
-          <div class="weather-temp"><span id="weatherTemp">--</span><span class="unit">°C</span></div>
+          <div class="weather-temp"><span id="weatherCondition"></span><span id="weatherTemp">--</span><span class="unit">°C</span></div>
           <div class="weather-details">
             <div class="weather-item"><span class="weather-label">Humidity</span><span id="weatherHumidity">--</span>%</div>
             <div class="weather-item">
@@ -756,6 +762,12 @@
           Show Weather Panel
         </label>
       </div>
+      <div class="settings-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="use24hClock">
+          Use 24-hour Clock
+        </label>
+      </div>
       <button class="settings-save" id="settingsSave">Save Settings</button>
       <button class="settings-reload" id="settingsReload">Force Reload App</button>
       <div class="settings-version" id="settingsVersion">v1.0.0</div>
@@ -778,7 +790,8 @@
         longitude: 153.02,
         showWeather: true,
         batterySize: 41,
-        batteryReserve: 10
+        batteryReserve: 10,
+        use24hClock: false
       };
 
       var refreshTimer = null;
@@ -802,6 +815,7 @@
         elements.gridImport = document.getElementById('gridImport');
         elements.weatherPanel = document.getElementById('weatherPanel');
         elements.weatherTemp = document.getElementById('weatherTemp');
+        elements.weatherCondition = document.getElementById('weatherCondition');
         elements.weatherHumidity = document.getElementById('weatherHumidity');
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
         elements.dewpointEmoji = document.getElementById('dewpointEmoji');
@@ -814,6 +828,7 @@
         elements.showWeather = document.getElementById('showWeather');
         elements.batterySize = document.getElementById('batterySize');
         elements.batteryReserve = document.getElementById('batteryReserve');
+        elements.use24hClock = document.getElementById('use24hClock');
       }
 
       function loadConfig() {
@@ -829,6 +844,7 @@
             config.showWeather = parsed.showWeather !== undefined ? parsed.showWeather : true;
             config.batterySize = parsed.batterySize || 41;
             config.batteryReserve = parsed.batteryReserve !== undefined ? parsed.batteryReserve : 10;
+            config.use24hClock = parsed.use24hClock !== undefined ? parsed.use24hClock : false;
           }
         } catch (e) {
           // Ignore errors
@@ -874,9 +890,17 @@
         var now = new Date();
         var hours = now.getHours();
         var minutes = now.getMinutes();
-        var hh = hours < 10 ? '0' + hours : '' + hours;
         var mm = minutes < 10 ? '0' + minutes : '' + minutes;
-        elements.currentTime.textContent = hh + ':' + mm;
+
+        if (config.use24hClock) {
+          var hh = hours < 10 ? '0' + hours : '' + hours;
+          elements.currentTime.textContent = hh + ':' + mm;
+        } else {
+          var period = hours >= 12 ? 'PM' : 'AM';
+          var h12 = hours % 12;
+          if (h12 === 0) h12 = 12;
+          elements.currentTime.textContent = h12 + ':' + mm + ' ' + period;
+        }
       }
 
       function getDewpointComfort(dewpoint) {
@@ -887,6 +911,24 @@
         if (dewpoint < 21) return { class: 'dewpoint-uncomfortable', emoji: '😓', label: 'Uncomfortable' };
         if (dewpoint < 24) return { class: 'dewpoint-humid', emoji: '😰', label: 'Very Humid' };
         return { class: 'dewpoint-oppressive', emoji: '🥵', label: 'Oppressive' };
+      }
+
+      // WMO Weather interpretation codes to emoji mapping
+      function getWeatherEmoji(code) {
+        if (code === 0) return '☀️';  // Clear sky
+        if (code === 1) return '🌤️';  // Mainly clear
+        if (code === 2) return '⛅';  // Partly cloudy
+        if (code === 3) return '☁️';  // Overcast
+        if (code === 45 || code === 48) return '🌫️';  // Fog
+        if (code >= 51 && code <= 55) return '🌧️';  // Drizzle
+        if (code >= 56 && code <= 57) return '🌧️';  // Freezing drizzle
+        if (code >= 61 && code <= 65) return '🌧️';  // Rain
+        if (code >= 66 && code <= 67) return '🌧️';  // Freezing rain
+        if (code >= 71 && code <= 77) return '🌨️';  // Snow
+        if (code >= 80 && code <= 82) return '🌧️';  // Rain showers
+        if (code >= 85 && code <= 86) return '🌨️';  // Snow showers
+        if (code >= 95 && code <= 99) return '⛈️';  // Thunderstorm
+        return '🌡️';  // Default
       }
 
       function updateWeatherVisibility() {
@@ -900,7 +942,7 @@
       function fetchWeather() {
         var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + config.latitude +
                   '&longitude=' + config.longitude +
-                  '&current=temperature_2m,relative_humidity_2m,dew_point_2m';
+                  '&current=temperature_2m,relative_humidity_2m,dew_point_2m,weather_code';
 
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url, true);
@@ -911,6 +953,13 @@
               if (data.current) {
                 elements.weatherTemp.textContent = Math.round(data.current.temperature_2m);
                 elements.weatherHumidity.textContent = Math.round(data.current.relative_humidity_2m);
+
+                // Weather condition emoji
+                var weatherCode = data.current.weather_code;
+                if (weatherCode !== undefined) {
+                  elements.weatherCondition.textContent = getWeatherEmoji(weatherCode);
+                  elements.weatherCondition.className = 'weather-condition';
+                }
 
                 var dewpoint = Math.round(data.current.dew_point_2m);
                 var comfort = getDewpointComfort(dewpoint);
@@ -963,7 +1012,16 @@
         var future = new Date(ms);
         var hh = future.getHours();
         var mm = future.getMinutes();
-        return (hh < 10 ? '0' : '') + hh + ':' + (mm < 10 ? '0' : '') + mm;
+        var mmStr = (mm < 10 ? '0' : '') + mm;
+
+        if (config.use24hClock) {
+          return (hh < 10 ? '0' : '') + hh + ':' + mmStr;
+        } else {
+          var period = hh >= 12 ? 'PM' : 'AM';
+          var h12 = hh % 12;
+          if (h12 === 0) h12 = 12;
+          return h12 + ':' + mmStr + ' ' + period;
+        }
       }
 
       function getVarValue(result, varName) {
@@ -1144,6 +1202,7 @@
         elements.batterySize.value = config.batterySize;
         elements.batteryReserve.value = config.batteryReserve;
         elements.showWeather.checked = config.showWeather;
+        elements.use24hClock.checked = config.use24hClock;
         elements.settingsOverlay.className = 'settings-overlay active';
       }
 
@@ -1185,8 +1244,10 @@
           config.batterySize = parseFloat(elements.batterySize.value) || 41;
           config.batteryReserve = parseInt(elements.batteryReserve.value, 10) || 10;
           config.showWeather = elements.showWeather.checked;
+          config.use24hClock = elements.use24hClock.checked;
           saveConfig();
           updateWeatherVisibility();
+          updateClock();
           closeSettings();
           fetchData();
           fetchWeather();
