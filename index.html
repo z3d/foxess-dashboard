@@ -313,6 +313,23 @@
       color: #888;
     }
 
+    .battery-time {
+      margin-top: 6px;
+      font-size: 0.75em;
+    }
+
+    .battery-time.charging {
+      color: #4ade80;
+    }
+
+    .battery-time.discharging {
+      color: #f87171;
+    }
+
+    .battery-time.hidden {
+      display: none;
+    }
+
     /* Stats Grid */
     .stats-grid {
       display: -webkit-box;
@@ -581,6 +598,7 @@
             <div class="battery-soc"><span id="socValue">--</span><span class="unit">%</span></div>
             <div class="battery-status idle" id="batteryStatus">Loading...</div>
             <div class="battery-details" id="batteryDetails">--</div>
+            <div class="battery-time hidden" id="batteryTime"></div>
           </div>
         </div>
         <div class="weather-panel" id="weatherPanel">
@@ -652,6 +670,10 @@
         <input type="text" id="longitude" placeholder="153.02">
       </div>
       <div class="settings-group">
+        <label for="batterySize">Battery Size (kWh)</label>
+        <input type="number" id="batterySize" value="41" min="1" max="500" step="0.1">
+      </div>
+      <div class="settings-group">
         <label class="checkbox-label">
           <input type="checkbox" id="showWeather">
           Show Weather Panel
@@ -671,7 +693,8 @@
         refreshInterval: 60,
         latitude: -27.47,
         longitude: 153.02,
-        showWeather: true
+        showWeather: true,
+        batterySize: 41
       };
 
       var refreshTimer = null;
@@ -688,6 +711,7 @@
         elements.socValue = document.getElementById('socValue');
         elements.batteryStatus = document.getElementById('batteryStatus');
         elements.batteryDetails = document.getElementById('batteryDetails');
+        elements.batteryTime = document.getElementById('batteryTime');
         elements.solarPower = document.getElementById('solarPower');
         elements.loadPower = document.getElementById('loadPower');
         elements.gridExport = document.getElementById('gridExport');
@@ -704,6 +728,7 @@
         elements.latitude = document.getElementById('latitude');
         elements.longitude = document.getElementById('longitude');
         elements.showWeather = document.getElementById('showWeather');
+        elements.batterySize = document.getElementById('batterySize');
       }
 
       function loadConfig() {
@@ -717,6 +742,7 @@
             config.latitude = parsed.latitude || -27.47;
             config.longitude = parsed.longitude || 153.02;
             config.showWeather = parsed.showWeather !== undefined ? parsed.showWeather : true;
+            config.batterySize = parsed.batterySize || 41;
           }
         } catch (e) {
           // Ignore errors
@@ -807,6 +833,16 @@
         return hh + ':' + mm + ':' + ss;
       }
 
+      function formatDuration(hours) {
+        if (hours <= 0 || !isFinite(hours)) return null;
+        var h = Math.floor(hours);
+        var m = Math.round((hours - h) * 60);
+        if (m === 60) { h++; m = 0; }
+        if (h === 0) return m + 'm';
+        if (m === 0) return h + 'h';
+        return h + 'h ' + m + 'm';
+      }
+
       function getVarValue(result, varName) {
         if (!result || !result.result) return null;
         var resultArr = result.result;
@@ -867,12 +903,32 @@
         dischargePower = dischargePower || 0;
 
         elements.batteryStatus.className = 'battery-status';
+        elements.batteryTime.className = 'battery-time hidden';
+
         if (chargePower > 0.05) {
           elements.batteryStatus.className = 'battery-status charging';
           elements.batteryStatus.textContent = 'Charging ' + formatNumber(chargePower, 2) + ' kW';
+
+          // Calculate time to full
+          var remainingCapacity = config.batterySize * (100 - soc) / 100;
+          var hoursToFull = remainingCapacity / chargePower;
+          var timeStr = formatDuration(hoursToFull);
+          if (timeStr) {
+            elements.batteryTime.textContent = 'Full in ' + timeStr;
+            elements.batteryTime.className = 'battery-time charging';
+          }
         } else if (dischargePower > 0.05) {
           elements.batteryStatus.className = 'battery-status discharging';
           elements.batteryStatus.textContent = 'Discharging ' + formatNumber(dischargePower, 2) + ' kW';
+
+          // Calculate time to empty
+          var availableCapacity = config.batterySize * soc / 100;
+          var hoursToEmpty = availableCapacity / dischargePower;
+          var timeStr2 = formatDuration(hoursToEmpty);
+          if (timeStr2) {
+            elements.batteryTime.textContent = 'Empty in ' + timeStr2;
+            elements.batteryTime.className = 'battery-time discharging';
+          }
         } else {
           elements.batteryStatus.className = 'battery-status idle';
           elements.batteryStatus.textContent = 'Idle';
@@ -957,6 +1013,7 @@
         elements.refreshInterval.value = config.refreshInterval;
         elements.latitude.value = config.latitude;
         elements.longitude.value = config.longitude;
+        elements.batterySize.value = config.batterySize;
         elements.showWeather.checked = config.showWeather;
         elements.settingsOverlay.className = 'settings-overlay active';
       }
@@ -988,6 +1045,7 @@
           config.refreshInterval = parseInt(elements.refreshInterval.value, 10) || 60;
           config.latitude = parseFloat(elements.latitude.value) || -27.47;
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
+          config.batterySize = parseFloat(elements.batterySize.value) || 41;
           config.showWeather = elements.showWeather.checked;
           saveConfig();
           updateWeatherVisibility();
