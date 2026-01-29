@@ -158,6 +158,37 @@
     .weather-panel {
       text-align: right;
       padding-left: 20px;
+      position: relative;
+    }
+
+    .weather-panel.hidden {
+      display: none;
+    }
+
+    .weather-toggle {
+      position: absolute;
+      top: -5px;
+      right: -5px;
+      background: rgba(255,255,255,0.1);
+      border: none;
+      color: #888;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      -webkit-border-radius: 50%;
+      font-size: 0.7em;
+      cursor: pointer;
+      -webkit-tap-highlight-color: transparent;
+      -webkit-appearance: none;
+    }
+
+    .weather-toggle:active {
+      background: rgba(255,255,255,0.2);
+    }
+
+    .weather-show-btn {
+      margin-left: 10px;
+      font-size: 0.8em;
     }
 
     .weather-temp {
@@ -186,6 +217,31 @@
       color: #888;
       margin-right: 8px;
     }
+
+    .dewpoint-indicator {
+      display: inline-block;
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      -webkit-border-radius: 50%;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+
+    .dewpoint-label {
+      font-size: 0.8em;
+      margin-left: 4px;
+      opacity: 0.7;
+    }
+
+    /* Dew point comfort levels */
+    .dewpoint-dry { background: #60a5fa; }
+    .dewpoint-comfortable { background: #4ade80; }
+    .dewpoint-ok { background: #a3e635; }
+    .dewpoint-sticky { background: #fbbf24; }
+    .dewpoint-uncomfortable { background: #fb923c; }
+    .dewpoint-humid { background: #f87171; }
+    .dewpoint-oppressive { background: #dc2626; }
 
     .battery-visual {
       position: relative;
@@ -508,6 +564,7 @@
       </div>
       <div class="header-time" id="currentTime">--:--</div>
       <div class="header-buttons">
+        <button class="btn weather-show-btn" id="weatherShowBtn" style="display: none;">Weather</button>
         <button class="btn" id="refreshBtn">Refresh</button>
         <button class="btn" id="settingsBtn">Settings</button>
       </div>
@@ -537,11 +594,14 @@
             <div class="battery-details" id="batteryDetails">--</div>
           </div>
         </div>
-        <div class="weather-panel">
+        <div class="weather-panel" id="weatherPanel">
+          <button class="weather-toggle" id="weatherToggle">×</button>
           <div class="weather-temp"><span id="weatherTemp">--</span><span class="unit">°C</span></div>
           <div class="weather-details">
             <div class="weather-item"><span class="weather-label">Humidity</span><span id="weatherHumidity">--</span>%</div>
-            <div class="weather-item"><span class="weather-label">Dew Point</span><span id="weatherDewpoint">--</span>°C</div>
+            <div class="weather-item">
+              <span class="weather-label">Dew Point</span><span id="weatherDewpoint">--</span>°C<span class="dewpoint-indicator" id="dewpointIndicator"></span><span class="dewpoint-label" id="dewpointLabel"></span>
+            </div>
           </div>
         </div>
       </div>
@@ -616,7 +676,8 @@
         apiKey: '',
         refreshInterval: 60,
         latitude: -27.47,
-        longitude: 153.02
+        longitude: 153.02,
+        showWeather: true
       };
 
       var refreshTimer = null;
@@ -637,9 +698,14 @@
         elements.loadPower = document.getElementById('loadPower');
         elements.gridExport = document.getElementById('gridExport');
         elements.gridImport = document.getElementById('gridImport');
+        elements.weatherPanel = document.getElementById('weatherPanel');
+        elements.weatherToggle = document.getElementById('weatherToggle');
+        elements.weatherShowBtn = document.getElementById('weatherShowBtn');
         elements.weatherTemp = document.getElementById('weatherTemp');
         elements.weatherHumidity = document.getElementById('weatherHumidity');
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
+        elements.dewpointIndicator = document.getElementById('dewpointIndicator');
+        elements.dewpointLabel = document.getElementById('dewpointLabel');
         elements.settingsOverlay = document.getElementById('settingsOverlay');
         elements.workerUrl = document.getElementById('workerUrl');
         elements.apiKey = document.getElementById('apiKey');
@@ -658,6 +724,7 @@
             config.refreshInterval = parsed.refreshInterval || 60;
             config.latitude = parsed.latitude || -27.47;
             config.longitude = parsed.longitude || 153.02;
+            config.showWeather = parsed.showWeather !== undefined ? parsed.showWeather : true;
           }
         } catch (e) {
           // Ignore errors
@@ -681,6 +748,32 @@
         elements.currentTime.textContent = hh + ':' + mm;
       }
 
+      function getDewpointComfort(dewpoint) {
+        if (dewpoint < 10) return { class: 'dewpoint-dry', label: 'Dry' };
+        if (dewpoint < 13) return { class: 'dewpoint-comfortable', label: 'Comfortable' };
+        if (dewpoint < 16) return { class: 'dewpoint-ok', label: 'OK' };
+        if (dewpoint < 18) return { class: 'dewpoint-sticky', label: 'Sticky' };
+        if (dewpoint < 21) return { class: 'dewpoint-uncomfortable', label: 'Uncomfortable' };
+        if (dewpoint < 24) return { class: 'dewpoint-humid', label: 'Very Humid' };
+        return { class: 'dewpoint-oppressive', label: 'Oppressive' };
+      }
+
+      function toggleWeather() {
+        config.showWeather = !config.showWeather;
+        saveConfig();
+        updateWeatherVisibility();
+      }
+
+      function updateWeatherVisibility() {
+        if (config.showWeather) {
+          elements.weatherPanel.className = 'weather-panel';
+          elements.weatherShowBtn.style.display = 'none';
+        } else {
+          elements.weatherPanel.className = 'weather-panel hidden';
+          elements.weatherShowBtn.style.display = 'inline-block';
+        }
+      }
+
       function fetchWeather() {
         var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + config.latitude +
                   '&longitude=' + config.longitude +
@@ -695,7 +788,13 @@
               if (data.current) {
                 elements.weatherTemp.textContent = Math.round(data.current.temperature_2m);
                 elements.weatherHumidity.textContent = Math.round(data.current.relative_humidity_2m);
-                elements.weatherDewpoint.textContent = Math.round(data.current.dew_point_2m);
+
+                var dewpoint = Math.round(data.current.dew_point_2m);
+                elements.weatherDewpoint.textContent = dewpoint;
+
+                var comfort = getDewpointComfort(dewpoint);
+                elements.dewpointIndicator.className = 'dewpoint-indicator ' + comfort.class;
+                elements.dewpointLabel.textContent = comfort.label;
               }
             } catch (e) {
               // Ignore errors
@@ -893,6 +992,9 @@
         }
         settingsClose.onclick = closeSettings;
 
+        elements.weatherToggle.onclick = toggleWeather;
+        elements.weatherShowBtn.onclick = toggleWeather;
+
         settingsSave.onclick = function() {
           var url = elements.workerUrl.value;
           if (url && url.charAt(url.length - 1) === '/') {
@@ -924,6 +1026,7 @@
       function init() {
         initElements();
         loadConfig();
+        updateWeatherVisibility();
         initSettings();
         fetchData();
         startAutoRefresh();
