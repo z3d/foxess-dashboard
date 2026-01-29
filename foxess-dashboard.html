@@ -587,7 +587,7 @@
           <div class="weather-details">
             <div class="weather-item"><span class="weather-label">Humidity</span><span id="weatherHumidity">--</span>%</div>
             <div class="weather-item">
-              <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--</span>°C<span class="dewpoint-emoji" id="dewpointEmoji"></span>
+              <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--°C</span><span class="dewpoint-emoji" id="dewpointEmoji"></span>
               <span class="dewpoint-label" id="dewpointLabel"></span>
             </div>
           </div>
@@ -777,7 +777,7 @@
                 var dewpoint = Math.round(data.current.dew_point_2m);
                 var comfort = getDewpointComfort(dewpoint);
 
-                elements.weatherDewpoint.textContent = dewpoint;
+                elements.weatherDewpoint.textContent = dewpoint + '°C';
                 elements.weatherDewpoint.className = 'dewpoint-value ' + comfort.class;
                 elements.dewpointEmoji.textContent = comfort.emoji;
                 elements.dewpointEmoji.className = 'dewpoint-emoji ' + comfort.class;
@@ -993,8 +993,8 @@
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
           config.showWeather = elements.showWeather.checked;
           saveConfig();
-          closeSettings();
           updateWeatherVisibility();
+          closeSettings();
           fetchData();
           fetchWeather();
           startAutoRefresh();
