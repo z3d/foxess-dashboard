@@ -760,7 +760,6 @@
 
         hideError();
         setStatus('online', 'Connected');
-        elements.lastUpdate.textContent = formatTime(new Date());
 
         var soc = getVarValue(data, 'SoC');
         if (soc !== null) {
