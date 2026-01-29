@@ -191,30 +191,19 @@
       margin-right: 8px;
     }
 
-    .dewpoint-indicator {
-      display: inline-block;
-      width: 8px;
-      height: 8px;
-      border-radius: 50%;
-      -webkit-border-radius: 50%;
-      margin-left: 6px;
-      vertical-align: middle;
-    }
-
-    .dewpoint-label {
-      font-size: 0.8em;
-      margin-left: 4px;
-      opacity: 0.7;
+    .dewpoint-comfort {
+      margin-left: 8px;
+      font-size: 0.9em;
     }
 
     /* Dew point comfort levels */
-    .dewpoint-dry { background: #60a5fa; }
-    .dewpoint-comfortable { background: #4ade80; }
-    .dewpoint-ok { background: #a3e635; }
-    .dewpoint-sticky { background: #fbbf24; }
-    .dewpoint-uncomfortable { background: #fb923c; }
-    .dewpoint-humid { background: #f87171; }
-    .dewpoint-oppressive { background: #dc2626; }
+    .dewpoint-dry { color: #60a5fa; }
+    .dewpoint-comfortable { color: #4ade80; }
+    .dewpoint-ok { color: #a3e635; }
+    .dewpoint-sticky { color: #fbbf24; }
+    .dewpoint-uncomfortable { color: #fb923c; }
+    .dewpoint-humid { color: #f87171; }
+    .dewpoint-oppressive { color: #dc2626; }
 
     .battery-visual {
       position: relative;
@@ -587,7 +576,7 @@
           <div class="weather-details">
             <div class="weather-item"><span class="weather-label">Humidity</span><span id="weatherHumidity">--</span>%</div>
             <div class="weather-item">
-              <span class="weather-label">Dew Point</span><span id="weatherDewpoint">--</span>°C<span class="dewpoint-indicator" id="dewpointIndicator"></span><span class="dewpoint-label" id="dewpointLabel"></span>
+              <span class="weather-label">Dew Point</span><span id="weatherDewpoint">--</span>°C<span class="dewpoint-comfort" id="dewpointComfort"></span>
             </div>
           </div>
         </div>
@@ -652,7 +641,7 @@
       </div>
       <div class="settings-group">
         <label class="checkbox-label">
-          <input type="checkbox" id="showWeather" checked>
+          <input type="checkbox" id="showWeather">
           Show Weather Panel
         </label>
       </div>
@@ -695,8 +684,7 @@
         elements.weatherTemp = document.getElementById('weatherTemp');
         elements.weatherHumidity = document.getElementById('weatherHumidity');
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
-        elements.dewpointIndicator = document.getElementById('dewpointIndicator');
-        elements.dewpointLabel = document.getElementById('dewpointLabel');
+        elements.dewpointComfort = document.getElementById('dewpointComfort');
         elements.settingsOverlay = document.getElementById('settingsOverlay');
         elements.workerUrl = document.getElementById('workerUrl');
         elements.apiKey = document.getElementById('apiKey');
@@ -741,13 +729,13 @@
       }
 
       function getDewpointComfort(dewpoint) {
-        if (dewpoint < 10) return { class: 'dewpoint-dry', label: 'Dry' };
-        if (dewpoint < 13) return { class: 'dewpoint-comfortable', label: 'Comfortable' };
-        if (dewpoint < 16) return { class: 'dewpoint-ok', label: 'OK' };
-        if (dewpoint < 18) return { class: 'dewpoint-sticky', label: 'Sticky' };
-        if (dewpoint < 21) return { class: 'dewpoint-uncomfortable', label: 'Uncomfortable' };
-        if (dewpoint < 24) return { class: 'dewpoint-humid', label: 'Very Humid' };
-        return { class: 'dewpoint-oppressive', label: 'Oppressive' };
+        if (dewpoint < 10) return { class: 'dewpoint-dry', emoji: '😊', label: 'Dry' };
+        if (dewpoint < 13) return { class: 'dewpoint-comfortable', emoji: '🙂', label: 'Comfortable' };
+        if (dewpoint < 16) return { class: 'dewpoint-ok', emoji: '😐', label: 'OK' };
+        if (dewpoint < 18) return { class: 'dewpoint-sticky', emoji: '😅', label: 'Sticky' };
+        if (dewpoint < 21) return { class: 'dewpoint-uncomfortable', emoji: '😓', label: 'Uncomfortable' };
+        if (dewpoint < 24) return { class: 'dewpoint-humid', emoji: '🥵', label: 'Very Humid' };
+        return { class: 'dewpoint-oppressive', emoji: '🥵', label: 'Oppressive' };
       }
 
       function updateWeatherVisibility() {
@@ -777,8 +765,8 @@
                 elements.weatherDewpoint.textContent = dewpoint;
 
                 var comfort = getDewpointComfort(dewpoint);
-                elements.dewpointIndicator.className = 'dewpoint-indicator ' + comfort.class;
-                elements.dewpointLabel.textContent = comfort.label;
+                elements.dewpointComfort.className = 'dewpoint-comfort ' + comfort.class;
+                elements.dewpointComfort.textContent = comfort.emoji + ' ' + comfort.label;
               }
             } catch (e) {
               // Ignore errors
@@ -989,8 +977,8 @@
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
           config.showWeather = elements.showWeather.checked;
           saveConfig();
-          updateWeatherVisibility();
           closeSettings();
+          updateWeatherVisibility();
           fetchData();
           fetchWeather();
           startAutoRefresh();
