@@ -191,9 +191,15 @@
       margin-right: 8px;
     }
 
+    .dewpoint-value {
+      display: inline;
+    }
+
     .dewpoint-comfort {
-      margin-left: 8px;
-      font-size: 0.9em;
+      display: block;
+      font-size: 0.75em;
+      margin-top: 2px;
+      margin-left: 85px;
     }
 
     /* Dew point comfort levels */
@@ -576,7 +582,8 @@
           <div class="weather-details">
             <div class="weather-item"><span class="weather-label">Humidity</span><span id="weatherHumidity">--</span>%</div>
             <div class="weather-item">
-              <span class="weather-label">Dew Point</span><span id="weatherDewpoint">--</span>°C<span class="dewpoint-comfort" id="dewpointComfort"></span>
+              <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--</span>°C
+              <span class="dewpoint-comfort" id="dewpointComfort"></span>
             </div>
           </div>
         </div>
@@ -762,9 +769,10 @@
                 elements.weatherHumidity.textContent = Math.round(data.current.relative_humidity_2m);
 
                 var dewpoint = Math.round(data.current.dew_point_2m);
-                elements.weatherDewpoint.textContent = dewpoint;
-
                 var comfort = getDewpointComfort(dewpoint);
+
+                elements.weatherDewpoint.textContent = dewpoint;
+                elements.weatherDewpoint.className = 'dewpoint-value ' + comfort.class;
                 elements.dewpointComfort.className = 'dewpoint-comfort ' + comfort.class;
                 elements.dewpointComfort.textContent = comfort.emoji + ' ' + comfort.label;
               }
