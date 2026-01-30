@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.0.5">
+  <meta name="app-version" content="1.0.6">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1014,13 +1014,28 @@
         var mm = future.getMinutes();
         var mmStr = (mm < 10 ? '0' : '') + mm;
 
+        var timeStr;
         if (config.use24hClock) {
-          return (hh < 10 ? '0' : '') + hh + ':' + mmStr;
+          timeStr = (hh < 10 ? '0' : '') + hh + ':' + mmStr;
         } else {
           var period = hh >= 12 ? 'PM' : 'AM';
           var h12 = hh % 12;
           if (h12 === 0) h12 = 12;
-          return h12 + ':' + mmStr + ' ' + period;
+          timeStr = h12 + ':' + mmStr + ' ' + period;
+        }
+
+        // Determine day offset
+        var todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        var futureStart = new Date(future.getFullYear(), future.getMonth(), future.getDate());
+        var dayDiff = Math.round((futureStart.getTime() - todayStart.getTime()) / 86400000);
+
+        if (dayDiff === 0) {
+          return timeStr;
+        } else if (dayDiff === 1) {
+          return 'tomorrow at ' + timeStr;
+        } else {
+          var days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+          return days[future.getDay()] + ' at ' + timeStr;
         }
       }
 
@@ -1096,7 +1111,7 @@
           var timeStr = formatDuration(hoursToFull);
           var expectedTime = formatExpectedTime(hoursToFull);
           if (timeStr && expectedTime) {
-            elements.batteryTime.textContent = 'Full in ' + timeStr + ' (at ' + expectedTime + ')';
+            elements.batteryTime.textContent = 'Full in ' + timeStr + ' (' + (expectedTime.indexOf('at') === -1 ? 'at ' : '') + expectedTime + ')';
             elements.batteryTime.className = 'battery-time charging';
           }
         } else if (dischargePower > 0.05) {
@@ -1111,7 +1126,7 @@
             var timeStr2 = formatDuration(hoursToReserve);
             var expectedTime2 = formatExpectedTime(hoursToReserve);
             if (timeStr2 && expectedTime2) {
-              elements.batteryTime.textContent = 'Reserve in ' + timeStr2 + ' (at ' + expectedTime2 + ')';
+              elements.batteryTime.textContent = 'Reserve in ' + timeStr2 + ' (' + (expectedTime2.indexOf('at') === -1 ? 'at ' : '') + expectedTime2 + ')';
               elements.batteryTime.className = 'battery-time discharging';
             }
           }
