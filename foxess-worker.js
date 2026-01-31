@@ -6,6 +6,7 @@
  * - FOXESS_DEVICE_SN: Your inverter serial number
  * - ALLOWED_ORIGIN: Allowed origin for CORS (e.g., https://yourdomain.com or *)
  * - API_KEY: Your API key for authenticating requests to the worker
+ * - CACHE_TTL: (Optional) Cache duration in seconds (default: 60)
  */
 
 const FOXESS_API_BASE = 'https://www.foxesscloud.com';
@@ -279,6 +280,24 @@ async function fetchReportData(env, reportType) {
   return response.json();
 }
 
+// Cache responses using Cloudflare Cache API
+async function cachedFetch(cacheKey, fetchFn, ttlSeconds) {
+  var cache = caches.default;
+  var cacheRequest = new Request('https://cache.internal/' + cacheKey);
+  var cached = await cache.match(cacheRequest);
+  if (cached) return cached;
+
+  var data = await fetchFn();
+  var response = new Response(JSON.stringify(data), {
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 's-maxage=' + ttlSeconds
+    }
+  });
+  cache.put(cacheRequest, response.clone());
+  return response;
+}
+
 export default {
   async fetch(request, env) {
     var url = new URL(request.url);
@@ -308,8 +327,12 @@ export default {
     // Real-time data endpoint
     if (url.pathname === '/api/realtime') {
       try {
-        var data = await fetchRealtimeData(env);
-        return new Response(JSON.stringify(data), {
+        var ttl = parseInt(env.CACHE_TTL) || 60;
+        var cached = await cachedFetch('realtime', function() {
+          return fetchRealtimeData(env);
+        }, ttl);
+        var body = await cached.text();
+        return new Response(body, {
           headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
         });
       } catch (error) {
@@ -324,8 +347,12 @@ export default {
     if (url.pathname === '/api/report') {
       try {
         var reportType = url.searchParams.get('type') || 'day';
-        var reportData = await fetchReportData(env, reportType);
-        return new Response(JSON.stringify(reportData), {
+        var ttl2 = parseInt(env.CACHE_TTL) || 60;
+        var cached2 = await cachedFetch('report-' + reportType, function() {
+          return fetchReportData(env, reportType);
+        }, ttl2);
+        var body2 = await cached2.text();
+        return new Response(body2, {
           headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
         });
       } catch (error) {
