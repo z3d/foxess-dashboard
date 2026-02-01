@@ -1,15 +1,15 @@
 /**
- * FoxESS Cloud API Proxy Worker
+ * FoxESS Cloud API shared helpers
  *
  * Environment variables required:
  * - FOXESS_API_KEY: Your FoxESS API key
  * - FOXESS_DEVICE_SN: Your inverter serial number
  * - ALLOWED_ORIGIN: Allowed origin for CORS (e.g., https://yourdomain.com or *)
- * - API_KEY: Your API key for authenticating requests to the worker
+ * - API_KEY: Your API key for authenticating requests
  * - CACHE_TTL: (Optional) Cache duration in seconds (default: 60)
  */
 
-const FOXESS_API_BASE = 'https://www.foxesscloud.com';
+var FOXESS_API_BASE = 'https://www.foxesscloud.com';
 
 // MD5 implementation for signature generation
 function md5(string) {
@@ -184,7 +184,7 @@ function createFoxESSHeaders(path, apiKey) {
 }
 
 // Handle CORS
-function corsHeaders(origin, allowedOrigin) {
+export function corsHeaders(origin, allowedOrigin) {
   var allowed = allowedOrigin === '*' || origin === allowedOrigin;
   return {
     'Access-Control-Allow-Origin': allowed ? (allowedOrigin === '*' ? '*' : origin) : '',
@@ -195,13 +195,13 @@ function corsHeaders(origin, allowedOrigin) {
 }
 
 // Validate API key
-function validateApiKey(request, env) {
+export function validateApiKey(request, env) {
   var providedKey = request.headers.get('X-API-Key');
   return providedKey && providedKey === env.API_KEY;
 }
 
 // Fetch real-time data from FoxESS
-async function fetchRealtimeData(env) {
+export async function fetchRealtimeData(env) {
   var path = '/op/v0/device/real/query';
   var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
 
@@ -232,7 +232,7 @@ async function fetchRealtimeData(env) {
 }
 
 // Fetch report data from FoxESS
-async function fetchReportData(env, reportType) {
+export async function fetchReportData(env, reportType) {
   var path = '/op/v0/device/report/query';
   var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
 
@@ -281,7 +281,7 @@ async function fetchReportData(env, reportType) {
 }
 
 // Cache responses using Cloudflare Cache API
-async function cachedFetch(cacheKey, fetchFn, ttlSeconds) {
+export async function cachedFetch(cacheKey, fetchFn, ttlSeconds) {
   var cache = caches.default;
   var cacheRequest = new Request('https://cache.internal/' + cacheKey);
   var cached = await cache.match(cacheRequest);
@@ -297,76 +297,3 @@ async function cachedFetch(cacheKey, fetchFn, ttlSeconds) {
   cache.put(cacheRequest, response.clone());
   return response;
 }
-
-export default {
-  async fetch(request, env) {
-    var url = new URL(request.url);
-    var origin = request.headers.get('Origin') || '';
-    var cors = corsHeaders(origin, env.ALLOWED_ORIGIN || '*');
-
-    // Handle CORS preflight
-    if (request.method === 'OPTIONS') {
-      return new Response(null, { headers: cors });
-    }
-
-    // Health check endpoint (no auth required)
-    if (url.pathname === '/api/health') {
-      return new Response(JSON.stringify({ status: 'ok', timestamp: Date.now() }), {
-        headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
-      });
-    }
-
-    // Validate API key for protected endpoints
-    if (!validateApiKey(request, env)) {
-      return new Response(JSON.stringify({ error: 'Unauthorized' }), {
-        status: 401,
-        headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
-      });
-    }
-
-    // Real-time data endpoint
-    if (url.pathname === '/api/realtime') {
-      try {
-        var ttl = parseInt(env.CACHE_TTL) || 60;
-        var cached = await cachedFetch('realtime', function() {
-          return fetchRealtimeData(env);
-        }, ttl);
-        var body = await cached.text();
-        return new Response(body, {
-          headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
-        });
-      } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 500,
-          headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
-        });
-      }
-    }
-
-    // Report data endpoint
-    if (url.pathname === '/api/report') {
-      try {
-        var reportType = url.searchParams.get('type') || 'day';
-        var ttl2 = parseInt(env.CACHE_TTL) || 60;
-        var cached2 = await cachedFetch('report-' + reportType, function() {
-          return fetchReportData(env, reportType);
-        }, ttl2);
-        var body2 = await cached2.text();
-        return new Response(body2, {
-          headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
-        });
-      } catch (error) {
-        return new Response(JSON.stringify({ error: error.message }), {
-          status: 500,
-          headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
-        });
-      }
-    }
-
-    // 404 for unknown routes
-    return new Response(JSON.stringify({ error: 'Not found' }), {
-      status: 404,
-      headers: Object.assign({}, cors, { 'Content-Type': 'application/json' })
-    });
-  }
-};

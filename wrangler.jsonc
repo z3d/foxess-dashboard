@@ -1,5 +1,5 @@
 {
   "name": "foxess-dashboard",
   "compatibility_date": "2026-01-27",
-  "main": "foxess-worker.js"
+  "pages_build_output_dir": "public"
 }
