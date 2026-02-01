@@ -1,0 +1,8 @@
+{
+  "name": "lucky-glade-17da",
+  "main": "src/worker.js",
+  "compatibility_date": "2026-01-27",
+  "assets": {
+    "directory": "./public"
+  }
+}
