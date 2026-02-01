@@ -1,6 +1,6 @@
 # FoxESS Battery Monitor Dashboard
 
-A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter and battery system.
+A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter and battery system. Deploys as a single Cloudflare Worker that serves both the dashboard UI and API.
 
 ## Features
 
@@ -17,13 +17,26 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - Dark theme optimized for always-on displays
 - "Add to Home Screen" support for iPad/iPhone
 - Auto-update detection with Force Reload option
-- Configurable refresh interval
+- Configurable refresh interval with countdown timer
+- Edge caching to reduce FoxESS API quota usage
+
+## Project Structure
+
+```
+├── wrangler.jsonc          # Worker configuration
+├── public/
+│   ├── index.html          # Dashboard frontend
+│   └── robots.txt
+└── src/
+    ├── worker.js           # Worker entry point (API routing)
+    └── lib/
+        └── foxess.js       # Shared helpers (FoxESS API, auth, caching)
+```
 
 ## Prerequisites
 
 - FoxESS Cloud account with API access
 - Cloudflare account (free tier works)
-- A web server to host the HTML file (or use Cloudflare Pages)
 
 ## Setup Instructions
 
@@ -35,9 +48,17 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 4. Copy and save your API key securely
 5. Note your inverter's **Serial Number** (found in Device List)
 
-### 2. Deploy the Cloudflare Worker
+### 2. Deploy to Cloudflare
 
-#### Option A: Wrangler CLI (Recommended)
+#### Option A: Git Integration (Recommended)
+
+1. Push this repo to GitHub
+2. In [Cloudflare Dashboard](https://dash.cloudflare.com), go to **Workers & Pages** → **Create** → **Import a repository**
+3. Connect your GitHub repo
+4. Set the deploy command to: `npx wrangler deploy`
+5. Deploy — pushes to `master` will auto-deploy
+
+#### Option B: Wrangler CLI
 
 1. Install Wrangler:
    ```bash
@@ -49,82 +70,33 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
    wrangler login
    ```
 
-3. Create a new worker project:
-   ```bash
-   mkdir foxess-worker && cd foxess-worker
-   wrangler init
-   ```
-
-4. Copy `foxess-worker.js` content to `src/index.js`
-
-5. Create `wrangler.toml`:
-   ```toml
-   name = "foxess-api"
-   main = "src/index.js"
-   compatibility_date = "2024-01-01"
-
-   [vars]
-   ALLOWED_ORIGIN = "*"
-   ```
-
-6. Set secrets:
-   ```bash
-   wrangler secret put FOXESS_API_KEY
-   wrangler secret put FOXESS_DEVICE_SN
-   wrangler secret put API_KEY  # Required for authentication
-   ```
-
-7. Deploy:
+3. Deploy:
    ```bash
    wrangler deploy
    ```
 
-8. Note your worker URL: `https://foxess-api.<your-subdomain>.workers.dev`
+4. Note your worker URL: `https://<your-worker>.<your-subdomain>.workers.dev`
 
-#### Option B: Cloudflare Dashboard
+### 3. Set Environment Variables
 
-1. Go to [Cloudflare Dashboard](https://dash.cloudflare.com)
-2. Navigate to **Workers & Pages** → **Create Application** → **Create Worker**
-3. Name your worker (e.g., `foxess-api`)
-4. Click **Deploy**
-5. Click **Edit Code** and paste the contents of `foxess-worker.js`
-6. Click **Save and Deploy**
-7. Go to **Settings** → **Variables**
-8. Add environment variables:
-   - `FOXESS_API_KEY`: Your FoxESS API key
-   - `FOXESS_DEVICE_SN`: Your inverter serial number
-   - `ALLOWED_ORIGIN`: `*` (or your dashboard URL for security)
-   - `API_KEY`: A secret key to authenticate requests to your worker (required)
-9. Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them
-10. Note your worker URL from the dashboard
+In **Cloudflare Dashboard > Workers & Pages > your worker > Settings > Variables and Secrets**, add:
 
-### 3. Host the Dashboard
+| Variable | Required | Description |
+|----------|----------|-------------|
+| `FOXESS_API_KEY` | Yes | Your FoxESS Cloud API key (encrypt) |
+| `FOXESS_DEVICE_SN` | Yes | Your inverter serial number |
+| `API_KEY` | Yes | Secret key for dashboard authentication (encrypt) |
+| `ALLOWED_ORIGIN` | No | Allowed CORS origin (default: `*`) |
+| `CACHE_TTL` | No | Cache duration in seconds (default: `60`) |
 
-#### Option A: Cloudflare Pages (Recommended)
-
-1. Go to **Workers & Pages** → **Create Application** → **Pages**
-2. Choose **Direct Upload**
-3. Upload `foxess-dashboard.html` (rename to `index.html`)
-4. Deploy and note your Pages URL
-
-#### Option B: Any Web Server
-
-Upload `foxess-dashboard.html` to any web hosting service:
-- GitHub Pages
-- Netlify
-- Your own web server
-- Local file (file:// works for testing)
-
-#### Option C: Local Testing
-
-Simply open `foxess-dashboard.html` in a browser. Note: Some features may be limited due to CORS when using file:// protocol.
+Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
 
 ### 4. Configure the Dashboard
 
-1. Open your hosted dashboard URL
+1. Open your worker URL in a browser (e.g., `https://<your-worker>.<your-subdomain>.workers.dev`)
 2. Click **Settings**
-3. Enter your Worker URL (e.g., `https://foxess-api.your-subdomain.workers.dev`)
-4. Enter your API Key (the same value you set in the worker's `API_KEY` environment variable)
+3. Enter your Worker URL (same as the URL you opened)
+4. Enter your API Key (the same value you set for `API_KEY` above)
 5. Set your preferred refresh interval (default: 60 seconds)
 6. Optionally update your latitude/longitude for weather data
 7. Configure battery settings:
@@ -159,25 +131,19 @@ To prevent inadvertent calls from third parties, the API requires authentication
 curl -H "X-API-Key: your-secret-key" https://your-worker.workers.dev/api/realtime
 ```
 
-### Dashboard configuration:
-
-The dashboard includes an API Key field in settings. Enter the same API key you configured in your worker's environment variables.
-
 ## API Endpoints
-
-The worker exposes these endpoints:
 
 | Endpoint | Method | Description | Auth Required |
 |----------|--------|-------------|---------------|
 | `/api/health` | GET | Health check | No |
-| `/api/realtime` | POST | Real-time inverter data | Yes |
-| `/api/report?type=day` | POST | Daily energy report | Yes |
+| `/api/realtime` | GET/POST | Real-time inverter data | Yes |
+| `/api/report?type=day` | GET/POST | Daily energy report | Yes |
 
 ## Troubleshooting
 
 ### "Connection failed" error
-- Verify your Worker URL is correct
-- Check that the worker is deployed and running
+- Verify your Worker URL is correct in dashboard settings
+- Check that the worker is deployed and running (`/api/health` should return OK)
 - Ensure CORS is properly configured (`ALLOWED_ORIGIN`)
 
 ### "API Error" message
@@ -189,6 +155,7 @@ The worker exposes these endpoints:
 - Check if your inverter is online in FoxESS Cloud
 - FoxESS data updates approximately every 5 minutes
 - Try clicking the Refresh button
+- Cached responses expire after `CACHE_TTL` seconds (default: 60)
 
 ### iOS 12 Safari issues
 - The dashboard is designed for iOS 12 compatibility
