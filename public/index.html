@@ -687,6 +687,7 @@
             <div class="weather-item">
               <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--°C</span><span class="dewpoint-emoji" id="dewpointEmoji"></span>
             </div>
+            <div class="weather-item" id="sunEvent" style="display:none"><span class="weather-label" id="sunLabel"></span><span id="sunTime"></span></div>
           </div>
         </div>
       </div>
@@ -821,6 +822,9 @@
         elements.weatherHumidity = document.getElementById('weatherHumidity');
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
         elements.dewpointEmoji = document.getElementById('dewpointEmoji');
+        elements.sunEvent = document.getElementById('sunEvent');
+        elements.sunLabel = document.getElementById('sunLabel');
+        elements.sunTime = document.getElementById('sunTime');
         elements.settingsOverlay = document.getElementById('settingsOverlay');
         elements.workerUrl = document.getElementById('workerUrl');
         elements.apiKey = document.getElementById('apiKey');
@@ -944,7 +948,8 @@
       function fetchWeather() {
         var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + config.latitude +
                   '&longitude=' + config.longitude +
-                  '&current=temperature_2m,relative_humidity_2m,dew_point_2m,weather_code';
+                  '&current=temperature_2m,relative_humidity_2m,dew_point_2m,weather_code' +
+                  '&daily=sunrise,sunset&timezone=auto&forecast_days=2';
 
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url, true);
@@ -970,6 +975,46 @@
                 elements.weatherDewpoint.className = 'dewpoint-value ' + comfort.class;
                 elements.dewpointEmoji.textContent = comfort.emoji;
                 elements.dewpointEmoji.className = 'dewpoint-emoji ' + comfort.class;
+
+                // Sunrise/sunset: show the next relevant event
+                if (data.daily && data.daily.sunrise && data.daily.sunset) {
+                  var now = new Date();
+                  var sunrises = data.daily.sunrise;
+                  var sunsets = data.daily.sunset;
+                  var nextSunrise = null;
+                  var nextSunset = null;
+                  var i;
+                  for (i = 0; i < sunrises.length; i++) {
+                    if (new Date(sunrises[i]) > now) { nextSunrise = new Date(sunrises[i]); break; }
+                  }
+                  for (i = 0; i < sunsets.length; i++) {
+                    if (new Date(sunsets[i]) > now) { nextSunset = new Date(sunsets[i]); break; }
+                  }
+                  var sunDate, sunIsRise;
+                  if (nextSunrise && nextSunset) {
+                    sunIsRise = nextSunrise < nextSunset;
+                    sunDate = sunIsRise ? nextSunrise : nextSunset;
+                  } else if (nextSunrise) {
+                    sunIsRise = true; sunDate = nextSunrise;
+                  } else if (nextSunset) {
+                    sunIsRise = false; sunDate = nextSunset;
+                  }
+                  if (sunDate) {
+                    var h = sunDate.getHours();
+                    var m = sunDate.getMinutes();
+                    var timeStr;
+                    if (config.use24hClock) {
+                      timeStr = h + ':' + (m < 10 ? '0' : '') + m;
+                    } else {
+                      var ampm = h >= 12 ? 'PM' : 'AM';
+                      var h12 = h % 12 || 12;
+                      timeStr = h12 + ':' + (m < 10 ? '0' : '') + m + ' ' + ampm;
+                    }
+                    elements.sunLabel.textContent = sunIsRise ? 'Sunrise' : 'Sunset';
+                    elements.sunTime.textContent = timeStr;
+                    elements.sunEvent.style.display = '';
+                  }
+                }
               }
             } catch (e) {
               // Ignore errors
