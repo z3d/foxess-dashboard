@@ -45,6 +45,13 @@ After completing significant features or structural changes, review and update a
 
 6. **Check version**: Ensure `<meta name="app-version">` was bumped if index.html changed
 
-7. **Apply updates** to any files that are out of date
+7. **Cross-check consistency**: Ensure these are in sync across all docs:
+   - API routes table (README.md, CLAUDE.md, backend skill)
+   - Environment variables table (README.md, CLAUDE.md)
+   - Project structure / file tree (README.md, CLAUDE.md)
+   - iOS 12 constraints (CLAUDE.md, frontend skill)
+   - Version bumping instructions (CLAUDE.md, frontend skill)
 
-8. **Ask the user** if they want to commit and push the documentation updates
+8. **Apply updates** to any files that are out of date
+
+9. **Ask the user** if they want to commit and push the documentation updates
