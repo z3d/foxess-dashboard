@@ -949,7 +949,7 @@
         var url = 'https://api.open-meteo.com/v1/forecast?latitude=' + config.latitude +
                   '&longitude=' + config.longitude +
                   '&current=temperature_2m,relative_humidity_2m,dew_point_2m,weather_code' +
-                  '&daily=sunrise,sunset&timezone=auto&forecast_days=2';
+                  '&daily=sunrise,sunset&timezone=auto&forecast_days=2&timeformat=unixtime';
 
         var xhr = new XMLHttpRequest();
         xhr.open('GET', url, true);
@@ -984,11 +984,12 @@
                   var nextSunrise = null;
                   var nextSunset = null;
                   var i;
+                  var nowUnix = Math.floor(now.getTime() / 1000);
                   for (i = 0; i < sunrises.length; i++) {
-                    if (new Date(sunrises[i]) > now) { nextSunrise = new Date(sunrises[i]); break; }
+                    if (sunrises[i] > nowUnix) { nextSunrise = new Date(sunrises[i] * 1000); break; }
                   }
                   for (i = 0; i < sunsets.length; i++) {
-                    if (new Date(sunsets[i]) > now) { nextSunset = new Date(sunsets[i]); break; }
+                    if (sunsets[i] > nowUnix) { nextSunset = new Date(sunsets[i] * 1000); break; }
                   }
                   var sunDate, sunIsRise;
                   if (nextSunrise && nextSunset) {
