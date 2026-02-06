@@ -87,7 +87,7 @@ All defined in `src/worker.js`:
 
 - After making changes, ask the user before committing and pushing
 - Always bump the version in `index.html` when modifying it
-- Keep README.md, CLAUDE.md, AGENTS.md, and skills up to date when making structural changes
+- Keep README.md, CLAUDE.md, AGENTS.md, and skills up to date when adding features or making structural changes
 - Run `/reflect` after completing significant features
 
 ## External APIs
