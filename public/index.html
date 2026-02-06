@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.1.0">
+  <meta name="app-version" content="1.1.1">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -798,6 +798,7 @@
       var refreshTimer = null;
       var countdownTimer = null;
       var nextRefreshTime = 0;
+      var lastSuccessfulUpdate = null;
       var elements = {};
 
       function initElements() {
@@ -1105,10 +1106,33 @@
         elements.statusText.textContent = message;
       }
 
+      function formatLastUpdated(date) {
+        if (!date) return '';
+        var hours = date.getHours();
+        var minutes = date.getMinutes();
+        var mm = minutes < 10 ? '0' + minutes : '' + minutes;
+
+        var timeStr;
+        if (config.use24hClock) {
+          var hh = hours < 10 ? '0' + hours : '' + hours;
+          timeStr = hh + ':' + mm;
+        } else {
+          var period = hours >= 12 ? 'PM' : 'AM';
+          var h12 = hours % 12;
+          if (h12 === 0) h12 = 12;
+          timeStr = h12 + ':' + mm + ' ' + period;
+        }
+        return timeStr;
+      }
+
       function showError(message) {
         elements.errorMessage.textContent = message;
         elements.errorMessage.style.display = 'block';
-        setStatus('error', 'Error');
+        var statusMsg = 'Error';
+        if (lastSuccessfulUpdate) {
+          statusMsg = 'Last updated ' + formatLastUpdated(lastSuccessfulUpdate);
+        }
+        setStatus('error', statusMsg);
       }
 
       function hideError() {
@@ -1123,6 +1147,7 @@
         }
 
         hideError();
+        lastSuccessfulUpdate = new Date();
         setStatus('online', 'Connected');
 
         var soc = getVarValue(data, 'SoC');
@@ -1254,10 +1279,16 @@
       }
 
       function updateCountdown() {
-        if (elements.statusDot.className.indexOf('online') === -1) return;
-        var remaining = Math.round((nextRefreshTime - Date.now()) / 1000);
-        if (remaining < 0) remaining = 0;
-        elements.statusText.textContent = 'Connected \u00b7 ' + remaining + 's';
+        var isOnline = elements.statusDot.className.indexOf('online') !== -1;
+        var isError = elements.statusDot.className.indexOf('error') !== -1;
+
+        if (isOnline) {
+          var remaining = Math.round((nextRefreshTime - Date.now()) / 1000);
+          if (remaining < 0) remaining = 0;
+          elements.statusText.textContent = 'Connected \u00b7 ' + remaining + 's';
+        } else if (isError && lastSuccessfulUpdate) {
+          elements.statusText.textContent = 'Last updated ' + formatLastUpdated(lastSuccessfulUpdate);
+        }
       }
 
       function startAutoRefresh() {
