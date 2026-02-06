@@ -12,12 +12,13 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - Solar generation power
 - Home load consumption
 - Grid import/export
-- Weather panel with current conditions emoji, temperature, humidity, and dew point comfort indicator
+- Weather panel with current conditions emoji, temperature, humidity, dew point comfort indicator, and sunrise/sunset times
 - 12-hour (AM/PM) or 24-hour clock format
 - Dark theme optimized for always-on displays
 - "Add to Home Screen" support for iPad/iPhone
 - Auto-update detection with Force Reload option
 - Configurable refresh interval with countdown timer
+- "Last updated" timestamp display on connection errors
 - Edge caching to reduce FoxESS API quota usage
 
 ## Project Structure
