@@ -16,7 +16,7 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - 12-hour (AM/PM) or 24-hour clock format
 - Dark theme optimized for always-on displays
 - "Add to Home Screen" support for iPad/iPhone
-- Auto-update detection with Force Reload option
+- Automatic reload when new version is deployed
 - Configurable refresh interval with countdown timer
 - "Last updated" timestamp display on connection errors
 - Edge caching to reduce FoxESS API quota usage

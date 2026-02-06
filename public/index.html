@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.1.1">
+  <meta name="app-version" content="1.1.2">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -883,11 +883,10 @@
       function checkForUpdates() {
         var storedVersion = localStorage.getItem('foxess_app_version');
         if (storedVersion && storedVersion !== APP_VERSION) {
-          // New version available
-          var banner = document.getElementById('updateBanner');
-          if (banner) {
-            banner.className = 'update-banner';
-          }
+          // New version available - auto-reload
+          localStorage.setItem('foxess_app_version', APP_VERSION);
+          forceReload();
+          return;
         }
         // Store current version
         localStorage.setItem('foxess_app_version', APP_VERSION);
