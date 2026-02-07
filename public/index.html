@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.2.0">
+  <meta name="app-version" content="1.2.1">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -272,6 +272,21 @@
     .battery-level.medium {
       background: -webkit-linear-gradient(bottom, #fbbf24, #f59e0b);
       background: linear-gradient(to top, #fbbf24, #f59e0b);
+    }
+
+    @-webkit-keyframes reserve-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    @keyframes reserve-blink {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.3; }
+    }
+
+    .battery-level.reserve-blink {
+      -webkit-animation: reserve-blink 1.5s ease-in-out infinite;
+      animation: reserve-blink 1.5s ease-in-out infinite;
     }
 
     .battery-info {
@@ -1269,6 +1284,11 @@
         } else {
           elements.batteryStatus.className = 'battery-status idle';
           elements.batteryStatus.textContent = 'Idle';
+
+          // Blink battery level when at reserve and idle
+          if (soc !== null && soc <= config.batteryReserve) {
+            elements.batteryLevel.className = elements.batteryLevel.className + ' reserve-blink';
+          }
         }
 
         var details = [];
