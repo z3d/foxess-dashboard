@@ -11,7 +11,7 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - Battery temperature and grid voltage
 - Solar generation power
 - Home load consumption
-- Grid import/export
+- Grid import/export with configurable free period highlighting (e.g., Globird ZeroHero)
 - Weather panel with current conditions emoji, temperature, humidity, dew point comfort indicator, and sunrise/sunset times
 - 12-hour (AM/PM) or 24-hour clock format
 - Dark theme optimized for always-on displays
@@ -103,10 +103,14 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
 7. Configure battery settings:
    - **Battery Size**: Your battery capacity in kWh (default: 41)
    - **Battery Reserve**: Minimum charge percentage to maintain (default: 10%)
-8. Toggle options:
+8. Configure **Free Grid Import Periods** for plans like Globird ZeroHero:
+   - Default: 11:00 - 14:00 (11 AM - 2 PM)
+   - Add additional periods with "+ Add Period"
+   - Grid import shows green during these times
+9. Toggle options:
    - **Show Weather Panel**: Display weather information (default: on)
    - **Use 24-hour Clock**: Switch between 12h AM/PM and 24h format (default: 12h)
-9. Click **Save Settings**
+10. Click **Save Settings**
 
 ### 5. Add to iPad Home Screen
 

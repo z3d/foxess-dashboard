@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.1.4">
+  <meta name="app-version" content="1.2.0">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -406,6 +406,44 @@
       color: #f87171;
     }
 
+    .stat-card.grid-import.free-period .stat-value {
+      color: #4ade80;
+    }
+
+    .free-period-row {
+      display: -webkit-box;
+      display: -webkit-flex;
+      display: flex;
+      -webkit-box-align: center;
+      -webkit-align-items: center;
+      align-items: center;
+      margin-bottom: 8px;
+    }
+
+    .free-period-row input {
+      width: 70px;
+      padding: 8px;
+      margin-right: 8px;
+      text-align: center;
+    }
+
+    .free-period-row .period-label {
+      color: #888;
+      margin-right: 8px;
+    }
+
+    .free-period-row .remove-period {
+      background: rgba(248, 113, 113, 0.2);
+      border: none;
+      color: #f87171;
+      padding: 6px 10px;
+      border-radius: 6px;
+      -webkit-border-radius: 6px;
+      cursor: pointer;
+      margin-left: 8px;
+      -webkit-appearance: none;
+    }
+
     /* Settings Panel */
     .settings-overlay {
       display: none;
@@ -712,7 +750,7 @@
             <div class="stat-value"><span id="gridExport">--</span> <span class="unit">kW</span></div>
           </div>
         </div>
-        <div class="stat-card grid-import">
+        <div class="stat-card grid-import" id="gridImportCard">
           <div class="stat-card-inner">
             <div class="stat-label"><span class="stat-icon">&#8595;</span> Grid Import</div>
             <div class="stat-value"><span id="gridImport">--</span> <span class="unit">kW</span></div>
@@ -758,6 +796,11 @@
         <input type="number" id="batteryReserve" value="10" min="0" max="100" step="1">
       </div>
       <div class="settings-group">
+        <label>Free Grid Import Periods</label>
+        <div id="freePeriodsContainer"></div>
+        <button type="button" class="btn" id="addFreePeriod" style="margin-top: 8px;">+ Add Period</button>
+      </div>
+      <div class="settings-group">
         <label class="checkbox-label">
           <input type="checkbox" id="showWeather">
           Show Weather Panel
@@ -792,7 +835,8 @@
         showWeather: true,
         batterySize: 41,
         batteryReserve: 10,
-        use24hClock: false
+        use24hClock: false,
+        freePeriods: [{start: 11, end: 14}]
       };
 
       var refreshTimer = null;
@@ -817,6 +861,7 @@
         elements.loadPower = document.getElementById('loadPower');
         elements.gridExport = document.getElementById('gridExport');
         elements.gridImport = document.getElementById('gridImport');
+        elements.gridImportCard = document.getElementById('gridImportCard');
         elements.weatherPanel = document.getElementById('weatherPanel');
         elements.weatherTemp = document.getElementById('weatherTemp');
         elements.weatherCondition = document.getElementById('weatherCondition');
@@ -835,6 +880,8 @@
         elements.showWeather = document.getElementById('showWeather');
         elements.batterySize = document.getElementById('batterySize');
         elements.batteryReserve = document.getElementById('batteryReserve');
+        elements.freePeriodsContainer = document.getElementById('freePeriodsContainer');
+        elements.addFreePeriod = document.getElementById('addFreePeriod');
         elements.use24hClock = document.getElementById('use24hClock');
       }
 
@@ -852,6 +899,7 @@
             config.batterySize = parsed.batterySize || 41;
             config.batteryReserve = parsed.batteryReserve !== undefined ? parsed.batteryReserve : 10;
             config.use24hClock = parsed.use24hClock !== undefined ? parsed.use24hClock : false;
+            config.freePeriods = parsed.freePeriods || [{start: 11, end: 14}];
           }
         } catch (e) {
           // Ignore errors
@@ -1031,6 +1079,19 @@
         }
         var d = decimals !== undefined ? decimals : 1;
         return Number(value).toFixed(d);
+      }
+
+      function isInFreePeriod() {
+        var now = new Date();
+        var currentHour = now.getHours() + now.getMinutes() / 60;
+        var periods = config.freePeriods || [];
+        for (var i = 0; i < periods.length; i++) {
+          var p = periods[i];
+          if (currentHour >= p.start && currentHour < p.end) {
+            return true;
+          }
+        }
+        return false;
       }
 
       function formatTime(date) {
@@ -1234,6 +1295,13 @@
         elements.loadPower.textContent = formatNumber(loadsPower, 2);
         elements.gridExport.textContent = formatNumber(feedinPower, 2);
         elements.gridImport.textContent = formatNumber(gridConsumption, 2);
+
+        // Update grid import color based on free period
+        if (isInFreePeriod()) {
+          elements.gridImportCard.className = 'stat-card grid-import free-period';
+        } else {
+          elements.gridImportCard.className = 'stat-card grid-import';
+        }
       }
 
       function fetchData() {
@@ -1305,6 +1373,46 @@
         countdownTimer = setInterval(updateCountdown, 1000);
       }
 
+      function renderFreePeriods() {
+        var container = elements.freePeriodsContainer;
+        container.innerHTML = '';
+        var periods = config.freePeriods || [];
+        for (var i = 0; i < periods.length; i++) {
+          var p = periods[i];
+          var row = document.createElement('div');
+          row.className = 'free-period-row';
+          row.innerHTML = '<input type="number" class="period-start" value="' + p.start + '" min="0" max="23" step="1">' +
+            '<span class="period-label">to</span>' +
+            '<input type="number" class="period-end" value="' + p.end + '" min="0" max="24" step="1">' +
+            '<span class="period-label">hrs</span>' +
+            '<button type="button" class="remove-period">x</button>';
+          container.appendChild(row);
+        }
+        // Add remove handlers
+        var removeButtons = container.querySelectorAll('.remove-period');
+        for (var j = 0; j < removeButtons.length; j++) {
+          (function(idx) {
+            removeButtons[idx].onclick = function() {
+              config.freePeriods.splice(idx, 1);
+              renderFreePeriods();
+            };
+          })(j);
+        }
+      }
+
+      function collectFreePeriods() {
+        var periods = [];
+        var rows = elements.freePeriodsContainer.querySelectorAll('.free-period-row');
+        for (var i = 0; i < rows.length; i++) {
+          var start = parseInt(rows[i].querySelector('.period-start').value, 10);
+          var end = parseInt(rows[i].querySelector('.period-end').value, 10);
+          if (!isNaN(start) && !isNaN(end) && end > start) {
+            periods.push({start: start, end: end});
+          }
+        }
+        return periods;
+      }
+
       function openSettings() {
         elements.workerUrl.value = config.workerUrl;
         elements.apiKey.value = config.apiKey;
@@ -1315,6 +1423,7 @@
         elements.batteryReserve.value = config.batteryReserve;
         elements.showWeather.checked = config.showWeather;
         elements.use24hClock.checked = config.use24hClock;
+        renderFreePeriods();
         elements.settingsOverlay.className = 'settings-overlay active';
       }
 
@@ -1343,6 +1452,11 @@
         }
         settingsClose.onclick = closeSettings;
 
+        elements.addFreePeriod.onclick = function() {
+          config.freePeriods.push({start: 0, end: 6});
+          renderFreePeriods();
+        };
+
         settingsSave.onclick = function() {
           var url = elements.workerUrl.value;
           if (url && url.charAt(url.length - 1) === '/') {
@@ -1355,6 +1469,7 @@
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
           config.batterySize = parseFloat(elements.batterySize.value) || 41;
           config.batteryReserve = parseInt(elements.batteryReserve.value, 10) || 10;
+          config.freePeriods = collectFreePeriods();
           config.showWeather = elements.showWeather.checked;
           config.use24hClock = elements.use24hClock.checked;
           saveConfig();
