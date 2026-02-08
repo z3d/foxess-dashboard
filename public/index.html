@@ -792,7 +792,7 @@
       </div>
       <div class="settings-group">
         <label for="refreshInterval">Refresh Interval (seconds)</label>
-        <input type="number" id="refreshInterval" value="60" min="10" max="300">
+        <input type="number" id="refreshInterval" value="180" min="10" max="300">
       </div>
       <div class="settings-group">
         <label for="latitude">Latitude</label>
@@ -828,6 +828,11 @@
         </label>
       </div>
       <button class="settings-save" id="settingsSave">Save Settings</button>
+      <div style="display:-webkit-box;display:-webkit-flex;display:flex;gap:10px;margin-top:10px;">
+        <button type="button" class="btn" id="exportSettings" style="-webkit-box-flex:1;flex:1;">Export Settings</button>
+        <button type="button" class="btn" id="importSettings" style="-webkit-box-flex:1;flex:1;">Import Settings</button>
+        <input type="file" id="importFileInput" accept=".json" style="display:none;">
+      </div>
       <button class="settings-reload" id="settingsReload">Force Reload App</button>
       <div class="settings-version" id="settingsVersion">v1.0.0</div>
     </div>
@@ -844,7 +849,7 @@
       var config = {
         workerUrl: window.location.origin,
         apiKey: '',
-        refreshInterval: 60,
+        refreshInterval: 180,
         latitude: -27.47,
         longitude: 153.02,
         showWeather: true,
@@ -907,7 +912,7 @@
             var parsed = JSON.parse(saved);
             config.workerUrl = parsed.workerUrl || window.location.origin;
             config.apiKey = parsed.apiKey || '';
-            config.refreshInterval = parsed.refreshInterval || 60;
+            config.refreshInterval = parsed.refreshInterval || 180;
             config.latitude = parsed.latitude || -27.47;
             config.longitude = parsed.longitude || 153.02;
             config.showWeather = parsed.showWeather !== undefined ? parsed.showWeather : true;
@@ -1451,6 +1456,48 @@
         elements.settingsOverlay.className = 'settings-overlay';
       }
 
+      function exportSettings() {
+        var exportData = JSON.stringify(config, null, 2);
+        var blob = new Blob([exportData], { type: 'application/json' });
+        var url = URL.createObjectURL(blob);
+        var a = document.createElement('a');
+        a.href = url;
+        a.download = 'foxess-dashboard-settings.json';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      function importSettings(file) {
+        var reader = new FileReader();
+        reader.onload = function(e) {
+          try {
+            var imported = JSON.parse(e.target.result);
+            if (imported.workerUrl !== undefined) config.workerUrl = imported.workerUrl;
+            if (imported.apiKey !== undefined) config.apiKey = imported.apiKey;
+            if (imported.refreshInterval !== undefined) config.refreshInterval = imported.refreshInterval;
+            if (imported.latitude !== undefined) config.latitude = imported.latitude;
+            if (imported.longitude !== undefined) config.longitude = imported.longitude;
+            if (imported.showWeather !== undefined) config.showWeather = imported.showWeather;
+            if (imported.batterySize !== undefined) config.batterySize = imported.batterySize;
+            if (imported.batteryReserve !== undefined) config.batteryReserve = imported.batteryReserve;
+            if (imported.use24hClock !== undefined) config.use24hClock = imported.use24hClock;
+            if (imported.freePeriods !== undefined) config.freePeriods = imported.freePeriods;
+            saveConfig();
+            openSettings();
+            var importBtn = document.getElementById('importSettings');
+            if (importBtn) {
+              importBtn.textContent = 'Imported!';
+              setTimeout(function() { importBtn.textContent = 'Import Settings'; }, 2000);
+            }
+          } catch (err) {
+            alert('Failed to import settings: Invalid JSON file');
+          }
+        };
+        reader.readAsText(file);
+      }
+
       function initSettings() {
         var settingsBtn = document.getElementById('settingsBtn');
         var settingsClose = document.getElementById('settingsClose');
@@ -1484,7 +1531,7 @@
           }
           config.workerUrl = url;
           config.apiKey = elements.apiKey.value;
-          config.refreshInterval = parseInt(elements.refreshInterval.value, 10) || 60;
+          config.refreshInterval = parseInt(elements.refreshInterval.value, 10) || 180;
           config.latitude = parseFloat(elements.latitude.value) || -27.47;
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
           config.batterySize = parseFloat(elements.batterySize.value) || 41;
@@ -1505,6 +1552,25 @@
           fetchData();
           startAutoRefresh();
         };
+
+        var exportBtn = document.getElementById('exportSettings');
+        var importBtn = document.getElementById('importSettings');
+        var importFileInput = document.getElementById('importFileInput');
+
+        if (exportBtn) {
+          exportBtn.onclick = exportSettings;
+        }
+        if (importBtn && importFileInput) {
+          importBtn.onclick = function() {
+            importFileInput.click();
+          };
+          importFileInput.onchange = function() {
+            if (importFileInput.files && importFileInput.files[0]) {
+              importSettings(importFileInput.files[0]);
+              importFileInput.value = '';
+            }
+          };
+        }
 
         if (settingsReload) {
           settingsReload.onclick = forceReload;

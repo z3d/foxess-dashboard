@@ -19,6 +19,7 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - Automatic reload when new version is deployed
 - Configurable refresh interval with countdown timer
 - "Last updated" timestamp display on connection errors
+- Import/export settings for easy backup and migration
 - Edge caching to reduce FoxESS API quota usage
 
 ## Project Structure
@@ -98,7 +99,7 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
 2. Click **Settings**
 3. The **Worker URL** defaults to the current origin — no need to change it unless you're hosting the frontend separately
 4. Enter your API Key (the same value you set for `API_KEY` above)
-5. Set your preferred refresh interval (default: 60 seconds)
+5. Set your preferred refresh interval (default: 180 seconds)
 6. Optionally update your latitude/longitude for weather data
 7. Configure battery settings:
    - **Battery Size**: Your battery capacity in kWh (default: 41)
@@ -111,6 +112,7 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
    - **Show Weather Panel**: Display weather information (default: on)
    - **Use 24-hour Clock**: Switch between 12h AM/PM and 24h format (default: 12h)
 10. Click **Save Settings**
+11. Use **Export Settings** / **Import Settings** to back up or restore your configuration as a JSON file
 
 ### 5. Add to iPad Home Screen
 
