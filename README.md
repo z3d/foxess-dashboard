@@ -96,7 +96,7 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
 
 1. Open your worker URL in a browser (e.g., `https://<your-worker>.<your-subdomain>.workers.dev`)
 2. Click **Settings**
-3. Enter your Worker URL (same as the URL you opened)
+3. The **Worker URL** defaults to the current origin — no need to change it unless you're hosting the frontend separately
 4. Enter your API Key (the same value you set for `API_KEY` above)
 5. Set your preferred refresh interval (default: 60 seconds)
 6. Optionally update your latitude/longitude for weather data

@@ -784,7 +784,7 @@
       </div>
       <div class="settings-group">
         <label for="workerUrl">Worker URL</label>
-        <input type="url" id="workerUrl" placeholder="https://your-worker.workers.dev">
+        <input type="url" id="workerUrl" placeholder="Defaults to current origin">
       </div>
       <div class="settings-group">
         <label for="apiKey">API Key</label>
@@ -842,7 +842,7 @@
       var APP_VERSION = versionMeta ? versionMeta.getAttribute('content') : '1.0.0';
 
       var config = {
-        workerUrl: '',
+        workerUrl: window.location.origin,
         apiKey: '',
         refreshInterval: 60,
         latitude: -27.47,
@@ -905,7 +905,7 @@
           var saved = localStorage.getItem('foxess_config');
           if (saved) {
             var parsed = JSON.parse(saved);
-            config.workerUrl = parsed.workerUrl || '';
+            config.workerUrl = parsed.workerUrl || window.location.origin;
             config.apiKey = parsed.apiKey || '';
             config.refreshInterval = parsed.refreshInterval || 60;
             config.latitude = parsed.latitude || -27.47;
