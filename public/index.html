@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.3.0">
+  <meta name="app-version" content="1.4.0">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -811,6 +811,10 @@
         <input type="number" id="batteryReserve" value="10" min="0" max="100" step="1">
       </div>
       <div class="settings-group">
+        <label for="chargeCutoffHours">Charge Cutoff Before Sunset (hours)</label>
+        <input type="number" id="chargeCutoffHours" value="2.5" min="0" max="8" step="0.5">
+      </div>
+      <div class="settings-group">
         <label>Free Grid Import Periods</label>
         <div id="freePeriodsContainer"></div>
         <button type="button" class="btn" id="addFreePeriod" style="margin-top: 8px;">+ Add Period</button>
@@ -856,6 +860,7 @@
         batterySize: 41,
         batteryReserve: 10,
         use24hClock: false,
+        chargeCutoffHours: 2.5,
         freePeriods: [{start: 11, end: 14}]
       };
 
@@ -863,6 +868,7 @@
       var countdownTimer = null;
       var nextRefreshTime = 0;
       var lastSuccessfulUpdate = null;
+      var todaySunsetUnix = null;
       var elements = {};
 
       function initElements() {
@@ -900,6 +906,7 @@
         elements.showWeather = document.getElementById('showWeather');
         elements.batterySize = document.getElementById('batterySize');
         elements.batteryReserve = document.getElementById('batteryReserve');
+        elements.chargeCutoffHours = document.getElementById('chargeCutoffHours');
         elements.freePeriodsContainer = document.getElementById('freePeriodsContainer');
         elements.addFreePeriod = document.getElementById('addFreePeriod');
         elements.use24hClock = document.getElementById('use24hClock');
@@ -918,6 +925,7 @@
             config.showWeather = parsed.showWeather !== undefined ? parsed.showWeather : true;
             config.batterySize = parsed.batterySize || 41;
             config.batteryReserve = parsed.batteryReserve !== undefined ? parsed.batteryReserve : 10;
+            config.chargeCutoffHours = parsed.chargeCutoffHours !== undefined ? parsed.chargeCutoffHours : 2.5;
             config.use24hClock = parsed.use24hClock !== undefined ? parsed.use24hClock : false;
             config.freePeriods = parsed.freePeriods || [{start: 11, end: 14}];
           }
@@ -1046,6 +1054,10 @@
 
                 // Sunrise/sunset: show the next relevant event
                 if (data.daily && data.daily.sunrise && data.daily.sunset) {
+                  // Store today's sunset for charge cutoff calculation
+                  if (data.daily.sunset.length > 0) {
+                    todaySunsetUnix = data.daily.sunset[0];
+                  }
                   var now = new Date();
                   var sunrises = data.daily.sunrise;
                   var sunsets = data.daily.sunset;
@@ -1267,7 +1279,17 @@
           var timeStr = formatDuration(hoursToFull);
           var expectedTime = formatExpectedTime(hoursToFull);
           if (timeStr && expectedTime) {
-            elements.batteryTime.textContent = 'Full in ' + timeStr + ' (' + (expectedTime.indexOf('at') === -1 && expectedTime.indexOf('on ') === -1 ? 'at ' : '') + expectedTime + ')';
+            // Check if expected full time is after charge cutoff (sunset - configured hours)
+            var afterCutoff = false;
+            if (todaySunsetUnix && config.chargeCutoffHours > 0) {
+              var cutoffUnix = todaySunsetUnix - (config.chargeCutoffHours * 3600);
+              var expectedFullUnix = Math.floor(Date.now() / 1000) + (hoursToFull * 3600);
+              if (expectedFullUnix > cutoffUnix) {
+                afterCutoff = true;
+              }
+            }
+            var marker = afterCutoff ? ' *' : '';
+            elements.batteryTime.textContent = 'Full in ' + timeStr + ' (' + (expectedTime.indexOf('at') === -1 && expectedTime.indexOf('on ') === -1 ? 'at ' : '') + expectedTime + ')' + marker;
             elements.batteryTime.className = 'battery-time charging';
           }
         } else if (dischargePower > 0.05) {
@@ -1446,6 +1468,7 @@
         elements.longitude.value = config.longitude;
         elements.batterySize.value = config.batterySize;
         elements.batteryReserve.value = config.batteryReserve;
+        elements.chargeCutoffHours.value = config.chargeCutoffHours;
         elements.showWeather.checked = config.showWeather;
         elements.use24hClock.checked = config.use24hClock;
         renderFreePeriods();
@@ -1482,6 +1505,7 @@
             if (imported.showWeather !== undefined) config.showWeather = imported.showWeather;
             if (imported.batterySize !== undefined) config.batterySize = imported.batterySize;
             if (imported.batteryReserve !== undefined) config.batteryReserve = imported.batteryReserve;
+            if (imported.chargeCutoffHours !== undefined) config.chargeCutoffHours = imported.chargeCutoffHours;
             if (imported.use24hClock !== undefined) config.use24hClock = imported.use24hClock;
             if (imported.freePeriods !== undefined) config.freePeriods = imported.freePeriods;
             saveConfig();
@@ -1536,6 +1560,7 @@
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
           config.batterySize = parseFloat(elements.batterySize.value) || 41;
           config.batteryReserve = parseInt(elements.batteryReserve.value, 10) || 10;
+          config.chargeCutoffHours = parseFloat(elements.chargeCutoffHours.value) || 2.5;
           config.freePeriods = collectFreePeriods();
           config.showWeather = elements.showWeather.checked;
           config.use24hClock = elements.use24hClock.checked;
