@@ -1,4 +1,4 @@
-import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, cachedFetch } from './lib/foxess.js';
+import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, fetchDeviceDetail, cachedFetch } from './lib/foxess.js';
 
 export default {
   async fetch(request, env) {
@@ -56,6 +56,22 @@ export default {
           }, ttl2);
           var body2 = await cached2.text();
           response = new Response(body2, {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+      } else if (path === '/api/device-detail') {
+        if (!validateApiKey(request, env)) {
+          response = new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          var cached3 = await cachedFetch('device-detail', function() {
+            return fetchDeviceDetail(env);
+          }, 3600);
+          var body3 = await cached3.text();
+          response = new Response(body3, {
             headers: { 'Content-Type': 'application/json' }
           });
         }
