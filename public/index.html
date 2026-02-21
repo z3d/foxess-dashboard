@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.7.1">
+  <meta name="app-version" content="1.7.2">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -803,6 +803,14 @@
         <input type="text" id="longitude" placeholder="153.02">
       </div>
       <div class="settings-group">
+        <label for="batterySize">Battery Size (kWh)</label>
+        <input type="number" id="batterySize" value="41.9" min="1" max="500" step="0.1">
+      </div>
+      <div class="settings-group">
+        <label for="batteryReserve">Battery Reserve (%)</label>
+        <input type="number" id="batteryReserve" value="10" min="0" max="100" step="1">
+      </div>
+      <div class="settings-group">
         <label for="chargeCutoffHours">Charge Cutoff Before Sunset (hours)</label>
         <input type="number" id="chargeCutoffHours" value="2.5" min="0" max="8" step="0.5">
       </div>
@@ -849,19 +857,17 @@
         latitude: -27.47,
         longitude: 153.02,
         showWeather: true,
+        batterySize: 41.9,
+        batteryReserve: 10,
         use24hClock: false,
         chargeCutoffHours: 2.5,
         freePeriods: [{start: 11, end: 14}]
       };
 
-      var apiRatedCapacity = null;
-      var apiMinSoc = null;
-
       var refreshTimer = null;
       var countdownTimer = null;
       var nextRefreshTime = 0;
       var lastSuccessfulUpdate = null;
-      var lastRealtimeData = null;
       var todaySunsetUnix = null;
       var elements = {};
 
@@ -898,6 +904,8 @@
         elements.latitude = document.getElementById('latitude');
         elements.longitude = document.getElementById('longitude');
         elements.showWeather = document.getElementById('showWeather');
+        elements.batterySize = document.getElementById('batterySize');
+        elements.batteryReserve = document.getElementById('batteryReserve');
         elements.chargeCutoffHours = document.getElementById('chargeCutoffHours');
         elements.freePeriodsContainer = document.getElementById('freePeriodsContainer');
         elements.addFreePeriod = document.getElementById('addFreePeriod');
@@ -915,6 +923,8 @@
             config.latitude = parsed.latitude || -27.47;
             config.longitude = parsed.longitude || 153.02;
             config.showWeather = parsed.showWeather !== undefined ? parsed.showWeather : true;
+            config.batterySize = parsed.batterySize || 41.9;
+            config.batteryReserve = parsed.batteryReserve !== undefined ? parsed.batteryReserve : 10;
             config.chargeCutoffHours = parsed.chargeCutoffHours !== undefined ? parsed.chargeCutoffHours : 2.5;
             config.use24hClock = parsed.use24hClock !== undefined ? parsed.use24hClock : false;
             config.freePeriods = parsed.freePeriods || [{start: 11, end: 14}];
@@ -1249,8 +1259,8 @@
           }
         }
 
-        var cap = apiRatedCapacity;
-        var reserve = apiMinSoc !== null ? apiMinSoc : 10;
+        var cap = config.batterySize;
+        var reserve = config.batteryReserve;
 
         var chargePower = getVarValue(data, 'batChargePower');
         var dischargePower = getVarValue(data, 'batDischargePower');
@@ -1267,7 +1277,7 @@
           elements.batteryStatus.textContent = 'Charging ' + formatNumber(chargePower, 2) + ' kW';
 
           // Calculate time to full
-          if (cap !== null && soc !== null) {
+          if (soc !== null) {
             var remainingCapacity = cap * (100 - soc) / 100;
             var hoursToFull = remainingCapacity / chargePower;
             var timeStr = formatDuration(hoursToFull);
@@ -1293,7 +1303,7 @@
 
           // Calculate time to reserve
           var usablePercent = soc - reserve;
-          if (usablePercent > 0 && cap !== null) {
+          if (usablePercent > 0) {
             var availableCapacity = cap * usablePercent / 100;
             var hoursToReserve = availableCapacity / dischargePower;
             var timeStr2 = formatDuration(hoursToReserve);
@@ -1340,7 +1350,7 @@
 
         var details = [];
         // Calculate and show kWh remaining
-        if (soc !== null && cap !== null) {
+        if (soc !== null) {
           var kwhRemaining = (soc / 100) * cap;
           details.push(formatNumber(kwhRemaining, 1) + ' kWh');
         }
@@ -1371,67 +1381,6 @@
         }
       }
 
-      function fetchDeviceConfig() {
-        if (!config.workerUrl || !config.apiKey) return;
-
-        // Use localStorage cache — device config rarely changes, 24h TTL
-        try {
-          var cached = JSON.parse(localStorage.getItem('foxess_device_config') || 'null');
-          if (cached && cached.ts && (Date.now() - cached.ts) < 86400000) {
-            if (cached.kWh) apiRatedCapacity = cached.kWh;
-            if (cached.minSoc !== undefined) apiMinSoc = cached.minSoc;
-            return;
-          }
-        } catch (e) {}
-
-        var fetched = { ts: Date.now() };
-
-        function saveCache() {
-          try { localStorage.setItem('foxess_device_config', JSON.stringify(fetched)); } catch (e) {}
-        }
-
-        var xhr1 = new XMLHttpRequest();
-        xhr1.open('GET', config.workerUrl + '/api/device-detail', true);
-        xhr1.setRequestHeader('X-API-Key', config.apiKey);
-        xhr1.onreadystatechange = function() {
-          if (xhr1.readyState === 4 && xhr1.status === 200) {
-            try {
-              var resp = JSON.parse(xhr1.responseText);
-              if (resp && resp.errno === 0 && resp.result && resp.result.batteryList) {
-                var list = resp.result.batteryList;
-                var totalWh = 0;
-                for (var i = 0; i < list.length; i++) { totalWh += list[i].capacity || 0; }
-                if (totalWh > 0) {
-                  apiRatedCapacity = totalWh / 1000;
-                  fetched.kWh = apiRatedCapacity;
-                  saveCache();
-                  if (lastRealtimeData) { try { updateRealtimeData(lastRealtimeData); } catch (e2) {} }
-                }
-              }
-            } catch (e) {}
-          }
-        };
-        xhr1.send();
-
-        var xhr2 = new XMLHttpRequest();
-        xhr2.open('GET', config.workerUrl + '/api/battery-soc', true);
-        xhr2.setRequestHeader('X-API-Key', config.apiKey);
-        xhr2.onreadystatechange = function() {
-          if (xhr2.readyState === 4 && xhr2.status === 200) {
-            try {
-              var resp2 = JSON.parse(xhr2.responseText);
-              if (resp2 && resp2.errno === 0 && resp2.result) {
-                apiMinSoc = resp2.result.minSocOnGrid;
-                fetched.minSoc = apiMinSoc;
-                saveCache();
-                if (lastRealtimeData) { try { updateRealtimeData(lastRealtimeData); } catch (e2) {} }
-              }
-            } catch (e) {}
-          }
-        };
-        xhr2.send();
-      }
-
       function fetchData() {
         if (!config.workerUrl) {
           elements.noConfig.style.display = 'block';
@@ -1455,7 +1404,6 @@
             if (xhr1.status === 200) {
               try {
                 var data = JSON.parse(xhr1.responseText);
-                lastRealtimeData = data;
                 try {
                   updateRealtimeData(data);
                 } catch (e2) {
@@ -1548,6 +1496,8 @@
         elements.refreshInterval.value = config.refreshInterval;
         elements.latitude.value = config.latitude;
         elements.longitude.value = config.longitude;
+        elements.batterySize.value = config.batterySize;
+        elements.batteryReserve.value = config.batteryReserve;
         elements.chargeCutoffHours.value = config.chargeCutoffHours;
         elements.showWeather.checked = config.showWeather;
         elements.use24hClock.checked = config.use24hClock;
@@ -1583,6 +1533,8 @@
             if (imported.latitude !== undefined) config.latitude = imported.latitude;
             if (imported.longitude !== undefined) config.longitude = imported.longitude;
             if (imported.showWeather !== undefined) config.showWeather = imported.showWeather;
+            if (imported.batterySize !== undefined) config.batterySize = imported.batterySize;
+            if (imported.batteryReserve !== undefined) config.batteryReserve = imported.batteryReserve;
             if (imported.chargeCutoffHours !== undefined) config.chargeCutoffHours = imported.chargeCutoffHours;
             if (imported.use24hClock !== undefined) config.use24hClock = imported.use24hClock;
             if (imported.freePeriods !== undefined) config.freePeriods = imported.freePeriods;
@@ -1636,6 +1588,9 @@
           config.refreshInterval = parseInt(elements.refreshInterval.value, 10) || 180;
           config.latitude = parseFloat(elements.latitude.value) || -27.47;
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
+          config.batterySize = parseFloat(elements.batterySize.value) || 41.9;
+          var bRes = parseFloat(elements.batteryReserve.value);
+          config.batteryReserve = isNaN(bRes) ? 10 : bRes;
           config.chargeCutoffHours = parseFloat(elements.chargeCutoffHours.value) || 2.5;
           config.freePeriods = collectFreePeriods();
           config.showWeather = elements.showWeather.checked;
@@ -1694,7 +1649,6 @@
         checkForUpdates();
         updateWeatherVisibility();
         initSettings();
-        fetchDeviceConfig();
         fetchData();
         startAutoRefresh();
         updateClock();

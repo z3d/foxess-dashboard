@@ -232,32 +232,6 @@ export async function fetchRealtimeData(env) {
 }
 
 // Fetch report data from FoxESS
-// Fetch device detail from FoxESS (includes battery capacity per module)
-export async function fetchDeviceDetail(env) {
-  var path = '/op/v0/device/detail';
-  var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
-
-  var response = await fetch(FOXESS_API_BASE + path + '?sn=' + encodeURIComponent(env.FOXESS_DEVICE_SN), {
-    method: 'GET',
-    headers: headers
-  });
-
-  return response.json();
-}
-
-// Fetch battery min SoC settings from FoxESS
-export async function fetchBatterySoc(env) {
-  var path = '/op/v0/device/battery/soc/get';
-  var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
-
-  var response = await fetch(FOXESS_API_BASE + path + '?sn=' + encodeURIComponent(env.FOXESS_DEVICE_SN), {
-    method: 'GET',
-    headers: headers
-  });
-
-  return response.json();
-}
-
 export async function fetchReportData(env, reportType) {
   var path = '/op/v0/device/report/query';
   var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
