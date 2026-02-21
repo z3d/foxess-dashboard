@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.5.2">
+  <meta name="app-version" content="1.5.3">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1304,28 +1304,28 @@
             var timeStr2 = formatDuration(hoursToReserve);
             var expectedTime2 = formatExpectedTime(hoursToReserve);
             if (timeStr2 && expectedTime2) {
-              // Check if reserve estimate crosses a free charge period
+              // Check if reserve estimate overlaps with any free charge period
               var reserveAfterFree = false;
               var periods = config.freePeriods || [];
               if (periods.length > 0) {
-                var expectedReserveUnix = Math.floor(Date.now() / 1000) + (hoursToReserve * 3600);
-                var expectedReserveDate = new Date(expectedReserveUnix * 1000);
-                var reserveHour = expectedReserveDate.getHours() + expectedReserveDate.getMinutes() / 60;
-                var nowDate = new Date();
-                var nowHour = nowDate.getHours() + nowDate.getMinutes() / 60;
+                var nowUnixR = Math.floor(Date.now() / 1000);
+                var reserveUnix = nowUnixR + Math.round(hoursToReserve * 3600);
+                var nowDateR = new Date();
+                var midnightUnix = nowUnixR - (nowDateR.getHours() * 3600) - (nowDateR.getMinutes() * 60) - nowDateR.getSeconds();
                 for (var fp = 0; fp < periods.length; fp++) {
                   var pStart = periods[fp].start;
                   var pEnd = periods[fp].end;
-                  // Free period is between now and reserve time
-                  if (pStart > nowHour && pStart < nowHour + hoursToReserve) {
-                    reserveAfterFree = true;
-                    break;
+                  // Check today and tomorrow's occurrence for overlap with now→reserve window
+                  for (var day = 0; day <= 1; day++) {
+                    var occStart = midnightUnix + (day * 86400) + (pStart * 3600);
+                    var occEnd = midnightUnix + (day * 86400) + (pEnd * 3600);
+                    if (occEnd <= nowUnixR) continue; // entirely in the past
+                    if (occStart < reserveUnix && occEnd > nowUnixR) {
+                      reserveAfterFree = true;
+                      break;
+                    }
                   }
-                  // Reserve time lands inside a free period
-                  if (reserveHour >= pStart && reserveHour < pEnd) {
-                    reserveAfterFree = true;
-                    break;
-                  }
+                  if (reserveAfterFree) break;
                 }
               }
               var marker2 = reserveAfterFree ? ' *' : '';
