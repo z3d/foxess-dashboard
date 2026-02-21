@@ -49,10 +49,24 @@ export default {
             headers: { 'Content-Type': 'application/json' }
           });
         } else {
-          var cachedDetail = await cachedFetch('device-detail', function() {
-            return fetchDeviceDetail(env);
-          }, 86400);
-          var bodyDetail = await cachedDetail.text();
+          // Don't use cachedFetch here — it caches error responses too.
+          // Instead, only cache on successful (errno 0) FoxESS responses.
+          var detailCache = caches.default;
+          var detailCacheReq = new Request('https://cache.internal/device-detail-v2');
+          var detailCached = await detailCache.match(detailCacheReq);
+          var bodyDetail;
+          if (detailCached) {
+            bodyDetail = await detailCached.text();
+          } else {
+            var detailData = await fetchDeviceDetail(env);
+            bodyDetail = JSON.stringify(detailData);
+            if (detailData && detailData.errno === 0) {
+              var detailResp = new Response(bodyDetail, {
+                headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=86400' }
+              });
+              detailCache.put(detailCacheReq, detailResp);
+            }
+          }
           console.log('[device-detail]', bodyDetail.substring(0, 500));
           response = new Response(bodyDetail, {
             headers: { 'Content-Type': 'application/json' }
