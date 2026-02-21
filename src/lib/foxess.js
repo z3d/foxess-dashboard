@@ -207,7 +207,6 @@ export async function fetchRealtimeData(env) {
 
   var variables = [
     'SoC',
-    'SoH',
     'pvPower',
     'loadsPower',
     'batChargePower',
@@ -227,19 +226,6 @@ export async function fetchRealtimeData(env) {
     method: 'POST',
     headers: headers,
     body: JSON.stringify(body)
-  });
-
-  return response.json();
-}
-
-// Fetch device detail from FoxESS (includes battery rated capacity)
-export async function fetchDeviceDetail(env) {
-  var path = '/op/v0/device/detail';
-  var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
-
-  var response = await fetch(FOXESS_API_BASE + path + '?sn=' + encodeURIComponent(env.FOXESS_DEVICE_SN), {
-    method: 'GET',
-    headers: headers
   });
 
   return response.json();
