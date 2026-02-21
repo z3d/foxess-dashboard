@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.7.0">
+  <meta name="app-version" content="1.7.1">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -861,6 +861,7 @@
       var countdownTimer = null;
       var nextRefreshTime = 0;
       var lastSuccessfulUpdate = null;
+      var lastRealtimeData = null;
       var todaySunsetUnix = null;
       var elements = {};
 
@@ -1400,7 +1401,12 @@
                 var list = resp.result.batteryList;
                 var totalWh = 0;
                 for (var i = 0; i < list.length; i++) { totalWh += list[i].capacity || 0; }
-                if (totalWh > 0) { apiRatedCapacity = totalWh / 1000; fetched.kWh = apiRatedCapacity; saveCache(); }
+                if (totalWh > 0) {
+                  apiRatedCapacity = totalWh / 1000;
+                  fetched.kWh = apiRatedCapacity;
+                  saveCache();
+                  if (lastRealtimeData) { try { updateRealtimeData(lastRealtimeData); } catch (e2) {} }
+                }
               }
             } catch (e) {}
           }
@@ -1418,6 +1424,7 @@
                 apiMinSoc = resp2.result.minSocOnGrid;
                 fetched.minSoc = apiMinSoc;
                 saveCache();
+                if (lastRealtimeData) { try { updateRealtimeData(lastRealtimeData); } catch (e2) {} }
               }
             } catch (e) {}
           }
@@ -1448,6 +1455,7 @@
             if (xhr1.status === 200) {
               try {
                 var data = JSON.parse(xhr1.responseText);
+                lastRealtimeData = data;
                 try {
                   updateRealtimeData(data);
                 } catch (e2) {
