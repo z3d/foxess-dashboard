@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.7.2">
+  <meta name="app-version" content="1.7.3">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1381,6 +1381,30 @@
         }
       }
 
+      function fetchDeviceConfig() {
+        if (!config.workerUrl || !config.apiKey) return;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', config.workerUrl + '/api/device-detail', true);
+        xhr.setRequestHeader('X-API-Key', config.apiKey);
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+              var resp = JSON.parse(xhr.responseText);
+              if (resp && resp.errno === 0 && resp.result && resp.result.batteryList) {
+                var list = resp.result.batteryList;
+                var totalWh = 0;
+                for (var i = 0; i < list.length; i++) { totalWh += list[i].capacity || 0; }
+                if (totalWh > 0) {
+                  config.batterySize = Math.round(totalWh / 100) / 10;
+                  saveConfig();
+                }
+              }
+            } catch (e) {}
+          }
+        };
+        xhr.send();
+      }
+
       function fetchData() {
         if (!config.workerUrl) {
           elements.noConfig.style.display = 'block';
@@ -1649,6 +1673,7 @@
         checkForUpdates();
         updateWeatherVisibility();
         initSettings();
+        fetchDeviceConfig();
         fetchData();
         startAutoRefresh();
         updateClock();
