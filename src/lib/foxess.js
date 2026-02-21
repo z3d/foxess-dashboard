@@ -200,21 +200,6 @@ export function validateApiKey(request, env) {
   return providedKey && providedKey === env.API_KEY;
 }
 
-// Fetch device detail from FoxESS (battery capacity etc.)
-export async function fetchDeviceDetail(env) {
-  var path = '/op/v0/device/detail';
-  var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
-  headers['User-Agent'] = 'Mozilla/5.0';
-  headers['Accept'] = 'application/json, */*';
-
-  var response = await fetch(FOXESS_API_BASE + path + '?sn=' + env.FOXESS_DEVICE_SN, {
-    method: 'GET',
-    headers: headers
-  });
-
-  return response.json();
-}
-
 // Fetch real-time data from FoxESS
 export async function fetchRealtimeData(env) {
   var path = '/op/v0/device/real/query';

@@ -1,4 +1,4 @@
-import { corsHeaders, validateApiKey, fetchDeviceDetail, fetchRealtimeData, fetchReportData, cachedFetch } from './lib/foxess.js';
+import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, cachedFetch } from './lib/foxess.js';
 
 export default {
   async fetch(request, env) {
@@ -38,37 +38,6 @@ export default {
           }, ttl);
           var body = await cached.text();
           response = new Response(body, {
-            headers: { 'Content-Type': 'application/json' }
-          });
-        }
-
-      } else if (path === '/api/device-detail') {
-        if (!validateApiKey(request, env)) {
-          response = new Response(JSON.stringify({ error: 'Unauthorized' }), {
-            status: 401,
-            headers: { 'Content-Type': 'application/json' }
-          });
-        } else {
-          // Don't use cachedFetch here — it caches error responses too.
-          // Instead, only cache on successful (errno 0) FoxESS responses.
-          var detailCache = caches.default;
-          var detailCacheReq = new Request('https://cache.internal/device-detail-v2');
-          var detailCached = await detailCache.match(detailCacheReq);
-          var bodyDetail;
-          if (detailCached) {
-            bodyDetail = await detailCached.text();
-          } else {
-            var detailData = await fetchDeviceDetail(env);
-            bodyDetail = JSON.stringify(detailData);
-            if (detailData && detailData.errno === 0) {
-              var detailResp = new Response(bodyDetail, {
-                headers: { 'Content-Type': 'application/json', 'Cache-Control': 's-maxage=86400' }
-              });
-              detailCache.put(detailCacheReq, detailResp);
-            }
-          }
-          console.log('[device-detail]', bodyDetail.substring(0, 500));
-          response = new Response(bodyDetail, {
             headers: { 'Content-Type': 'application/json' }
           });
         }
