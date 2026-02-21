@@ -1,4 +1,4 @@
-import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, fetchDeviceDetail, cachedFetch } from './lib/foxess.js';
+import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, fetchDeviceDetail, fetchBatterySoc, cachedFetch } from './lib/foxess.js';
 
 export default {
   async fetch(request, env) {
@@ -69,6 +69,19 @@ export default {
         } else {
           var detail = await fetchDeviceDetail(env);
           response = new Response(JSON.stringify(detail), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+      } else if (path === '/api/battery-soc') {
+        if (!validateApiKey(request, env)) {
+          response = new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          var socSettings = await fetchBatterySoc(env);
+          response = new Response(JSON.stringify(socSettings), {
             headers: { 'Content-Type': 'application/json' }
           });
         }
