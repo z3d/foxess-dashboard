@@ -53,6 +53,7 @@ export default {
             return fetchDeviceDetail(env);
           }, 86400);
           var bodyDetail = await cachedDetail.text();
+          console.log('[device-detail]', bodyDetail.substring(0, 500));
           response = new Response(bodyDetail, {
             headers: { 'Content-Type': 'application/json' }
           });
