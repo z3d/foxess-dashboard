@@ -291,7 +291,7 @@ export async function cachedFetch(cacheKey, fetchFn, ttlSeconds) {
   var response = new Response(JSON.stringify(data), {
     headers: {
       'Content-Type': 'application/json',
-      'Cache-Control': 's-maxage=' + ttlSeconds
+      'Cache-Control': 'public, max-age=' + ttlSeconds
     }
   });
   cache.put(cacheRequest, response.clone());
