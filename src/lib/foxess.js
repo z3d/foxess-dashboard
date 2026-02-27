@@ -280,20 +280,26 @@ export async function fetchReportData(env, reportType) {
   return response.json();
 }
 
-// Cache responses using Cloudflare Cache API
+// Module-level cache: persists across requests within the same isolate
+var _cacheData = {};
+var _cacheTime = {};
+
+// Cache responses using module-level variables (caches.default with synthetic
+// URLs was not storing reliably; this pattern matches the brisbane-dashboard worker)
 export async function cachedFetch(cacheKey, fetchFn, ttlSeconds) {
-  var cache = caches.default;
-  var cacheRequest = new Request('https://cache.internal/' + cacheKey);
-  var cached = await cache.match(cacheRequest);
-  if (cached) return cached;
+  var now = Date.now();
+  if (_cacheData[cacheKey] && (now - _cacheTime[cacheKey]) < ttlSeconds * 1000) {
+    return new Response(_cacheData[cacheKey], {
+      headers: { 'Content-Type': 'application/json' }
+    });
+  }
 
   var data = await fetchFn();
-  var response = new Response(JSON.stringify(data), {
-    headers: {
-      'Content-Type': 'application/json',
-      'Cache-Control': 'public, max-age=' + ttlSeconds
-    }
+  var json = JSON.stringify(data);
+  _cacheData[cacheKey] = json;
+  _cacheTime[cacheKey] = now;
+
+  return new Response(json, {
+    headers: { 'Content-Type': 'application/json' }
   });
-  cache.put(cacheRequest, response.clone());
-  return response;
 }
