@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.7.4">
+  <meta name="app-version" content="1.7.5">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -795,6 +795,10 @@
         <input type="number" id="refreshInterval" value="180" min="10" max="300">
       </div>
       <div class="settings-group">
+        <label for="reloadTimeInput">Daily reload hour (0-23, -1=off)</label>
+        <input type="number" id="reloadTimeInput" value="2" min="-1" max="23">
+      </div>
+      <div class="settings-group">
         <label for="latitude">Latitude</label>
         <input type="text" id="latitude" placeholder="-27.47">
       </div>
@@ -854,6 +858,7 @@
         workerUrl: window.location.origin,
         apiKey: '',
         refreshInterval: 180,
+        reloadTime: 2,
         latitude: -27.47,
         longitude: 153.02,
         showWeather: true,
@@ -901,6 +906,7 @@
         elements.workerUrl = document.getElementById('workerUrl');
         elements.apiKey = document.getElementById('apiKey');
         elements.refreshInterval = document.getElementById('refreshInterval');
+        elements.reloadTimeInput = document.getElementById('reloadTimeInput');
         elements.latitude = document.getElementById('latitude');
         elements.longitude = document.getElementById('longitude');
         elements.showWeather = document.getElementById('showWeather');
@@ -920,6 +926,7 @@
             config.workerUrl = parsed.workerUrl || window.location.origin;
             config.apiKey = parsed.apiKey || '';
             config.refreshInterval = parsed.refreshInterval || 180;
+            config.reloadTime = parsed.reloadTime !== undefined ? parseInt(parsed.reloadTime) : 2;
             config.latitude = parsed.latitude || -27.47;
             config.longitude = parsed.longitude || 153.02;
             config.showWeather = parsed.showWeather !== undefined ? parsed.showWeather : true;
@@ -954,6 +961,15 @@
         // Reload with cache busting
         var url = window.location.href.split('?')[0];
         window.location.href = url + '?v=' + Date.now();
+      }
+
+      function scheduleNightlyReload() {
+        if (config.reloadTime < 0 || config.reloadTime > 23) return;
+        var now = new Date();
+        var target = new Date();
+        target.setHours(config.reloadTime, 0, 0, 0);
+        if (target <= now) { target.setDate(target.getDate() + 1); }
+        setTimeout(forceReload, target - now);
       }
 
       function checkForUpdates() {
@@ -1494,6 +1510,7 @@
         elements.workerUrl.value = config.workerUrl;
         elements.apiKey.value = config.apiKey;
         elements.refreshInterval.value = config.refreshInterval;
+        elements.reloadTimeInput.value = config.reloadTime;
         elements.latitude.value = config.latitude;
         elements.longitude.value = config.longitude;
         elements.batterySize.value = config.batterySize;
@@ -1530,6 +1547,7 @@
             if (imported.workerUrl !== undefined) config.workerUrl = imported.workerUrl;
             if (imported.apiKey !== undefined) config.apiKey = imported.apiKey;
             if (imported.refreshInterval !== undefined) config.refreshInterval = imported.refreshInterval;
+            if (imported.reloadTime !== undefined) config.reloadTime = imported.reloadTime;
             if (imported.latitude !== undefined) config.latitude = imported.latitude;
             if (imported.longitude !== undefined) config.longitude = imported.longitude;
             if (imported.showWeather !== undefined) config.showWeather = imported.showWeather;
@@ -1586,6 +1604,8 @@
           config.workerUrl = url;
           config.apiKey = elements.apiKey.value;
           config.refreshInterval = parseInt(elements.refreshInterval.value, 10) || 180;
+          config.reloadTime = parseInt(elements.reloadTimeInput.value, 10);
+          if (isNaN(config.reloadTime) || config.reloadTime < -1 || config.reloadTime > 23) config.reloadTime = -1;
           config.latitude = parseFloat(elements.latitude.value) || -27.47;
           config.longitude = parseFloat(elements.longitude.value) || 153.02;
           config.batterySize = parseFloat(elements.batterySize.value) || 41.9;
@@ -1647,6 +1667,7 @@
         initElements();
         loadConfig();
         checkForUpdates();
+        scheduleNightlyReload();
         updateWeatherVisibility();
         initSettings();
         fetchData();
