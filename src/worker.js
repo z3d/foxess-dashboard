@@ -32,7 +32,7 @@ export default {
             headers: { 'Content-Type': 'application/json' }
           });
         } else {
-          var ttl = parseInt(env.CACHE_TTL) || 80;
+          var ttl = parseInt(env.CACHE_TTL) || 300;
           var cached = await cachedFetch('realtime', function() {
             return fetchRealtimeData(env);
           }, ttl);
@@ -50,7 +50,7 @@ export default {
           });
         } else {
           var reportType = url.searchParams.get('type') || 'day';
-          var ttl2 = parseInt(env.CACHE_TTL) || 80;
+          var ttl2 = parseInt(env.CACHE_TTL) || 300;
           var cached2 = await cachedFetch('report-' + reportType, function() {
             return fetchReportData(env, reportType);
           }, ttl2);
