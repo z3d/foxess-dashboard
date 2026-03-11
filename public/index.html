@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.7.5">
+  <meta name="app-version" content="1.7.6">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -129,6 +129,28 @@
 
     .status-dot.error {
       background: #f87171;
+    }
+
+    .status-dot.stale {
+      background: #fbbf24;
+    }
+
+    .stale-banner {
+      background: rgba(251, 191, 36, 0.2);
+      border: 1px solid rgba(251, 191, 36, 0.4);
+      border-radius: 12px;
+      -webkit-border-radius: 12px;
+      padding: 12px 15px;
+      margin-bottom: 15px;
+      font-size: 0.8em;
+      color: #fbbf24;
+      display: none;
+    }
+
+    .stale-banner.severe {
+      background: rgba(248, 113, 113, 0.2);
+      border-color: rgba(248, 113, 113, 0.4);
+      color: #f87171;
     }
 
     /* Battery Section */
@@ -708,6 +730,8 @@
       <button class="update-btn" id="updateBtn">Reload</button>
     </div>
 
+    <div id="staleBanner" class="stale-banner"></div>
+
     <div id="noConfig" class="no-config" style="display: none;">
       <h2>Welcome</h2>
       <p>Configure your Worker URL in settings to get started.</p>
@@ -882,6 +906,7 @@
         elements.currentTime = document.getElementById('currentTime');
         elements.noConfig = document.getElementById('noConfig');
         elements.errorMessage = document.getElementById('errorMessage');
+        elements.staleBanner = document.getElementById('staleBanner');
         elements.dashboard = document.getElementById('dashboard');
         elements.batteryLevel = document.getElementById('batteryLevel');
         elements.socValue = document.getElementById('socValue');
@@ -1250,6 +1275,66 @@
         elements.errorMessage.style.display = 'none';
       }
 
+      function parseApiTime(timeStr) {
+        // Parse "2026-03-11 22:37:35 AEST+1000" format
+        if (!timeStr) return null;
+        var match = timeStr.match(/(\d{4})-(\d{2})-(\d{2}) (\d{2}):(\d{2}):(\d{2}).*([+-])(\d{2})(\d{2})$/);
+        if (!match) return null;
+        var sign = match[7] === '+' ? 1 : -1;
+        var d = new Date(Date.UTC(
+          parseInt(match[1], 10),
+          parseInt(match[2], 10) - 1,
+          parseInt(match[3], 10),
+          parseInt(match[4], 10) - sign * parseInt(match[8], 10),
+          parseInt(match[5], 10) - sign * parseInt(match[9], 10),
+          parseInt(match[6], 10)
+        ));
+        return isNaN(d.getTime()) ? null : d;
+      }
+
+      function formatDurationAgo(ms) {
+        var seconds = Math.floor(ms / 1000);
+        if (seconds < 60) return seconds + 's ago';
+        var minutes = Math.floor(seconds / 60);
+        if (minutes < 60) return minutes + 'm ago';
+        var hours = Math.floor(minutes / 60);
+        var remainMins = minutes % 60;
+        if (hours < 24) return hours + 'h ' + remainMins + 'm ago';
+        var days = Math.floor(hours / 24);
+        var remainHrs = hours % 24;
+        return days + 'd ' + remainHrs + 'h ago';
+      }
+
+      function updateStaleBanner(data) {
+        var banner = elements.staleBanner;
+        if (!data || !data.result || !data.result[0]) {
+          banner.style.display = 'none';
+          return null;
+        }
+        var apiTime = parseApiTime(data.result[0].time);
+        if (!apiTime) {
+          banner.style.display = 'none';
+          return null;
+        }
+        var ageMs = Date.now() - apiTime.getTime();
+        var ageMinutes = ageMs / 60000;
+        // Stale: >10 min, severe: >60 min
+        if (ageMinutes > 10) {
+          banner.style.display = 'block';
+          banner.textContent = 'Inverter data is ' + formatDurationAgo(ageMs) + ' (last reported ' + formatLastUpdated(apiTime) + ')';
+          if (ageMinutes > 60) {
+            banner.className = 'stale-banner severe';
+            return 'severe';
+          } else {
+            banner.className = 'stale-banner';
+            return 'stale';
+          }
+        } else {
+          banner.style.display = 'none';
+          return null;
+        }
+      }
+
       function updateRealtimeData(data) {
         if (data.errno !== 0) {
           var msg = data.msg || 'Unknown error';
@@ -1259,7 +1344,15 @@
 
         hideError();
         lastSuccessfulUpdate = new Date();
-        setStatus('online', 'Connected');
+
+        var staleness = updateStaleBanner(data);
+        if (staleness === 'severe') {
+          setStatus('error', 'Data stale');
+        } else if (staleness === 'stale') {
+          setStatus('stale', 'Data delayed');
+        } else {
+          setStatus('online', 'Connected');
+        }
 
         var soc = getVarValue(data, 'SoC');
         if (soc !== null) {
@@ -1442,13 +1535,18 @@
       }
 
       function updateCountdown() {
-        var isOnline = elements.statusDot.className.indexOf('online') !== -1;
-        var isError = elements.statusDot.className.indexOf('error') !== -1;
+        var dotClass = elements.statusDot.className;
+        var isOnline = dotClass.indexOf('online') !== -1;
+        var isStale = dotClass.indexOf('stale') !== -1;
+        var isError = dotClass.indexOf('error') !== -1;
+
+        var remaining = Math.round((nextRefreshTime - Date.now()) / 1000);
+        if (remaining < 0) remaining = 0;
 
         if (isOnline) {
-          var remaining = Math.round((nextRefreshTime - Date.now()) / 1000);
-          if (remaining < 0) remaining = 0;
           elements.statusText.textContent = 'Connected \u00b7 ' + remaining + 's';
+        } else if (isStale) {
+          elements.statusText.textContent = 'Data delayed \u00b7 ' + remaining + 's';
         } else if (isError && lastSuccessfulUpdate) {
           elements.statusText.textContent = 'Last updated ' + formatLastUpdated(lastSuccessfulUpdate);
         }
