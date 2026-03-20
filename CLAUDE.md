@@ -14,6 +14,8 @@ Single Cloudflare Worker serving a static dashboard (HTML/CSS/JS) and JSON API e
 ├── wrangler.jsonc          # Worker config (name, entry, assets)
 ├── public/
 │   ├── index.html          # Single-file dashboard (HTML + CSS + JS)
+│   ├── sw.js               # Service worker for offline support (standalone/home-screen mode)
+│   ├── manifest.webmanifest # Web app manifest (standalone display)
 │   └── robots.txt
 └── src/
     ├── worker.js           # Worker entry: routes /api/* requests
@@ -49,6 +51,15 @@ The Worker code (`src/`) runs on Cloudflare's V8 runtime and CAN use modern JS, 
 ### Version Bumping
 
 `public/index.html` has `<meta name="app-version" content="X.Y.Z">`. Bump this (semver) whenever changing index.html. The auto-update banner compares this against localStorage to notify users.
+
+## Offline / Standalone Support
+
+A service worker (`public/sw.js`) prevents blank-screen-of-death when the app is added to the iOS home screen and loses network:
+
+- **Network-first**: Tries network, falls back to cached HTML, last resort is a styled offline page with Retry button
+- **Precaches on install**: `cache.add('/')` during SW install event
+- **XHR offline indicator**: Hooks `XMLHttpRequest.prototype.send` to detect network failures and show a red "OFFLINE" badge next to the clock
+- **`forceReload()` preserves SW cache**: Only clears non-SW caches so offline fallback survives forced reloads
 
 ## Common Gotchas
 

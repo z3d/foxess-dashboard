@@ -8,8 +8,9 @@
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="FoxESS">
   <meta name="theme-color" content="#1a1a2e">
+  <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.7.7">
+  <meta name="app-version" content="1.8.0">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -73,6 +74,14 @@
       font-size: 2.5em;
       font-weight: 600;
       color: #fff;
+    }
+
+    .offline-indicator {
+      display: none;
+      color: #ff6b6b;
+      font-size: 0.45em;
+      vertical-align: middle;
+      margin-left: 8px;
     }
 
     .header-buttons {
@@ -719,6 +728,7 @@
         </div>
       </div>
       <div class="header-time" id="currentTime">--:--</div>
+      <span class="offline-indicator" id="offlineIndicator">OFFLINE</span>
       <div class="header-buttons">
         <button class="btn" id="refreshBtn">Refresh</button>
         <button class="btn" id="settingsBtn">Settings</button>
@@ -975,12 +985,14 @@
       }
 
       function forceReload() {
-        // Clear caches if available
+        // Clear non-SW caches if available (preserve foxess-dashboard-* for offline support)
         if ('caches' in window) {
           caches.keys().then(function(names) {
-            names.forEach(function(name) {
-              caches.delete(name);
-            });
+            for (var i = 0; i < names.length; i++) {
+              if (names[i].indexOf('foxess-dashboard') === -1) {
+                caches.delete(names[i]);
+              }
+            }
           });
         }
         // Reload with cache busting
@@ -1775,6 +1787,27 @@
         fetchWeather();
         setInterval(fetchWeather, 600000); // Update weather every 10 minutes
       }
+
+      // Register service worker for offline support (standalone/home-screen mode)
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.register('/sw.js').catch(function() {});
+      }
+
+      // Offline indicator — driven by actual XHR success/failure
+      var _isOffline = false;
+      function setOfflineStatus(offline) {
+        if (_isOffline === offline) return;
+        _isOffline = offline;
+        var el = document.getElementById('offlineIndicator');
+        if (el) { el.style.display = offline ? 'inline' : 'none'; }
+      }
+      // Hook all XHRs: 'load' = network OK (even if HTTP error), 'error' = network failure
+      var _origSend = XMLHttpRequest.prototype.send;
+      XMLHttpRequest.prototype.send = function() {
+        this.addEventListener('load', function() { setOfflineStatus(false); }, false);
+        this.addEventListener('error', function() { setOfflineStatus(true); }, false);
+        return _origSend.apply(this, arguments);
+      };
 
       if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', init, false);
