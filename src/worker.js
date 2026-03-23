@@ -32,9 +32,11 @@ async function fetchSolarForecast() {
   var tmrw = new Date(now.getTime() + 86400000);
   var tmrwStr = tmrw.toISOString().substring(0, 10);
 
+  // Derating factor: actual mean 25.5 kWh vs forecast ~42 kWh ≈ 0.607
+  var derate = 0.607;
   return {
-    today: Math.round((totals[todayStr] || 0) / 100) / 10,
-    tomorrow: Math.round((totals[tmrwStr] || 0) / 100) / 10
+    today: Math.round((totals[todayStr] || 0) * derate / 100) / 10,
+    tomorrow: Math.round((totals[tmrwStr] || 0) * derate / 100) / 10
   };
 }
 

@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.9.0">
+  <meta name="app-version" content="1.9.1">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1346,14 +1346,14 @@
           if (xhr.readyState === 4 && xhr.status === 200) {
             try {
               var data = JSON.parse(xhr.responseText);
-              if (data.today !== undefined) {
+              if (data.today > 0) {
                 var todayTier = getSolarTier(data.today);
                 elements.solarFcstTodayVal.textContent = data.today + ' kWh';
                 elements.solarFcstTodayTier.textContent = todayTier.label;
                 elements.solarFcstTodayTier.className = todayTier.cls;
                 elements.solarForecastToday.style.display = '';
               }
-              if (data.tomorrow !== undefined) {
+              if (data.tomorrow > 0) {
                 var tmrwTier = getSolarTier(data.tomorrow);
                 elements.solarFcstTmrwVal.textContent = data.tomorrow + ' kWh';
                 elements.solarFcstTmrwTier.textContent = tmrwTier.label;
