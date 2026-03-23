@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.9.1">
+  <meta name="app-version" content="1.10.0">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -780,8 +780,7 @@
             <div class="weather-item">
               <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--°C</span><span class="dewpoint-emoji" id="dewpointEmoji"></span>
             </div>
-            <div class="weather-item" id="solarForecastToday" style="display:none"><span class="weather-label">Fcst</span><span id="solarFcstTodayVal"></span> <span id="solarFcstTodayTier"></span></div>
-            <div class="weather-item" id="solarForecastTmrw" style="display:none"><span class="weather-label">Tmrw</span><span id="solarFcstTmrwVal"></span> <span id="solarFcstTmrwTier"></span></div>
+            <div class="weather-item" id="solarForecastRow" style="display:none"><span class="weather-label">Fcst</span><span id="solarFcstTodayVal"></span> <span id="solarFcstTodayTier"></span><span id="solarFcstTmrwWrap"> / <span id="solarFcstTmrwVal"></span> <span id="solarFcstTmrwTier"></span></span></div>
             <div class="weather-item" id="sunEvent" style="display:none"><span class="weather-label" id="sunLabel"></span><span id="sunTime"></span></div>
           </div>
         </div>
@@ -942,10 +941,10 @@
         elements.weatherHumidity = document.getElementById('weatherHumidity');
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
         elements.dewpointEmoji = document.getElementById('dewpointEmoji');
-        elements.solarForecastToday = document.getElementById('solarForecastToday');
+        elements.solarForecastRow = document.getElementById('solarForecastRow');
         elements.solarFcstTodayVal = document.getElementById('solarFcstTodayVal');
         elements.solarFcstTodayTier = document.getElementById('solarFcstTodayTier');
-        elements.solarForecastTmrw = document.getElementById('solarForecastTmrw');
+        elements.solarFcstTmrwWrap = document.getElementById('solarFcstTmrwWrap');
         elements.solarFcstTmrwVal = document.getElementById('solarFcstTmrwVal');
         elements.solarFcstTmrwTier = document.getElementById('solarFcstTmrwTier');
         elements.sunEvent = document.getElementById('sunEvent');
@@ -1338,6 +1337,86 @@
         return { label: 'Poor', cls: 'solar-tier-poor' };
       }
 
+      // Solar forecast calibration: compare forecast vs actual over time
+      function loadCalibration() {
+        try {
+          var raw = localStorage.getItem('foxess_solar_cal');
+          return raw ? JSON.parse(raw) : {};
+        } catch (e) { return {}; }
+      }
+
+      function saveCalibration(cal) {
+        try {
+          // Prune entries older than 30 days
+          var cutoff = new Date();
+          cutoff.setDate(cutoff.getDate() - 30);
+          var cutoffStr = cutoff.toISOString().substring(0, 10);
+          var keys = Object.keys(cal);
+          for (var i = 0; i < keys.length; i++) {
+            if (keys[i] < cutoffStr) delete cal[keys[i]];
+          }
+          localStorage.setItem('foxess_solar_cal', JSON.stringify(cal));
+        } catch (e) { /* ignore */ }
+      }
+
+      function computeCorrectionFactor(cal) {
+        var sumForecast = 0;
+        var sumActual = 0;
+        var count = 0;
+        var keys = Object.keys(cal);
+        for (var i = 0; i < keys.length; i++) {
+          var entry = cal[keys[i]];
+          if (entry.forecast > 0 && entry.actual > 0) {
+            sumForecast += entry.forecast;
+            sumActual += entry.actual;
+            count++;
+          }
+        }
+        if (count < 2) return 0.607; // fallback
+        return sumActual / sumForecast;
+      }
+
+      function getTodayStr() {
+        var d = new Date();
+        var y = d.getFullYear();
+        var m = d.getMonth() + 1;
+        var dd = d.getDate();
+        return y + '-' + (m < 10 ? '0' : '') + m + '-' + (dd < 10 ? '0' : '') + dd;
+      }
+
+      function getYesterdayStr() {
+        var d = new Date();
+        d.setDate(d.getDate() - 1);
+        var y = d.getFullYear();
+        var m = d.getMonth() + 1;
+        var dd = d.getDate();
+        return y + '-' + (m < 10 ? '0' : '') + m + '-' + (dd < 10 ? '0' : '') + dd;
+      }
+
+      function fetchYesterdayGeneration(cal) {
+        var yesterday = getYesterdayStr();
+        // Only fetch if we have a forecast for yesterday but no actual
+        if (!cal[yesterday] || !cal[yesterday].forecast || cal[yesterday].actual) return;
+
+        var baseUrl = config.workerUrl || window.location.origin;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', baseUrl + '/api/daily-generation?date=' + yesterday, true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        if (config.apiKey) xhr.setRequestHeader('X-API-Key', config.apiKey);
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+              var data = JSON.parse(xhr.responseText);
+              if (data.generation > 0) {
+                cal[yesterday].actual = data.generation;
+                saveCalibration(cal);
+              }
+            } catch (e) { /* ignore */ }
+          }
+        };
+        xhr.send();
+      }
+
       function fetchSolarForecast() {
         var baseUrl = config.workerUrl || window.location.origin;
         var xhr = new XMLHttpRequest();
@@ -1346,19 +1425,41 @@
           if (xhr.readyState === 4 && xhr.status === 200) {
             try {
               var data = JSON.parse(xhr.responseText);
+              var cal = loadCalibration();
+
+              // Store today's raw forecast for calibration
+              var today = getTodayStr();
               if (data.today > 0) {
-                var todayTier = getSolarTier(data.today);
-                elements.solarFcstTodayVal.textContent = data.today + ' kWh';
+                if (!cal[today]) cal[today] = {};
+                cal[today].forecast = data.today;
+                saveCalibration(cal);
+              }
+
+              // Try to fetch yesterday's actual generation for calibration
+              fetchYesterdayGeneration(cal);
+
+              // Compute correction factor from historical data
+              var factor = computeCorrectionFactor(cal);
+
+              // Apply factor and display
+              var adjToday = Math.round(data.today * factor * 10) / 10;
+              var adjTmrw = Math.round(data.tomorrow * factor * 10) / 10;
+
+              if (adjToday > 0) {
+                var todayTier = getSolarTier(adjToday);
+                elements.solarFcstTodayVal.textContent = adjToday;
                 elements.solarFcstTodayTier.textContent = todayTier.label;
                 elements.solarFcstTodayTier.className = todayTier.cls;
-                elements.solarForecastToday.style.display = '';
+                elements.solarForecastRow.style.display = '';
               }
-              if (data.tomorrow > 0) {
-                var tmrwTier = getSolarTier(data.tomorrow);
-                elements.solarFcstTmrwVal.textContent = data.tomorrow + ' kWh';
+              if (adjTmrw > 0) {
+                var tmrwTier = getSolarTier(adjTmrw);
+                elements.solarFcstTmrwVal.textContent = adjTmrw;
                 elements.solarFcstTmrwTier.textContent = tmrwTier.label;
                 elements.solarFcstTmrwTier.className = tmrwTier.cls;
-                elements.solarForecastTmrw.style.display = '';
+                elements.solarFcstTmrwWrap.style.display = '';
+              } else {
+                elements.solarFcstTmrwWrap.style.display = 'none';
               }
             } catch (e) {
               // Ignore errors

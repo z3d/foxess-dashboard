@@ -32,11 +32,9 @@ async function fetchSolarForecast() {
   var tmrw = new Date(now.getTime() + 86400000);
   var tmrwStr = tmrw.toISOString().substring(0, 10);
 
-  // Derating factor: actual mean 25.5 kWh vs forecast ~42 kWh ≈ 0.607
-  var derate = 0.607;
   return {
-    today: Math.round((totals[todayStr] || 0) * derate / 100) / 10,
-    tomorrow: Math.round((totals[tmrwStr] || 0) * derate / 100) / 10
+    today: Math.round((totals[todayStr] || 0) / 100) / 10,
+    tomorrow: Math.round((totals[tmrwStr] || 0) / 100) / 10
   };
 }
 
@@ -96,6 +94,48 @@ export default {
           }, ttl2);
           var body2 = await cached2.text();
           response = new Response(body2, {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+      } else if (path === '/api/daily-generation') {
+        if (!validateApiKey(request, env)) {
+          response = new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          // Default to yesterday in AEST (UTC+10)
+          var dateParam = url.searchParams.get('date');
+          var genDate;
+          if (dateParam) {
+            var parts = dateParam.split('-');
+            genDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+          } else {
+            var nowAest = new Date(Date.now() + 10 * 3600000);
+            genDate = new Date(nowAest.getTime() - 86400000);
+          }
+          var dateKey = genDate.getFullYear() + '-' +
+            (genDate.getMonth() + 1 < 10 ? '0' : '') + (genDate.getMonth() + 1) + '-' +
+            (genDate.getDate() < 10 ? '0' : '') + genDate.getDate();
+          var cached4 = await cachedFetch('daily-gen-' + dateKey, function() {
+            return fetchReportData(env, 'day', genDate).then(function(data) {
+              var total = 0;
+              if (data && data.result) {
+                for (var g = 0; g < data.result.length; g++) {
+                  if (data.result[g].variable === 'generation' && data.result[g].data) {
+                    var pts = data.result[g].data;
+                    for (var h = 0; h < pts.length; h++) {
+                      total += pts[h].value || 0;
+                    }
+                  }
+                }
+              }
+              return { date: dateKey, generation: Math.round(total * 10) / 10 };
+            });
+          }, 21600);
+          var body4 = await cached4.text();
+          response = new Response(body4, {
             headers: { 'Content-Type': 'application/json' }
           });
         }

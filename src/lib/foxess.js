@@ -232,14 +232,15 @@ export async function fetchRealtimeData(env) {
 }
 
 // Fetch report data from FoxESS
-export async function fetchReportData(env, reportType) {
+// Optional dateObj parameter overrides the default (today)
+export async function fetchReportData(env, reportType, dateObj) {
   var path = '/op/v0/device/report/query';
   var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
 
-  var now = new Date();
-  var year = now.getFullYear();
-  var month = now.getMonth() + 1;
-  var day = now.getDate();
+  var d = dateObj || new Date();
+  var year = d.getFullYear();
+  var month = d.getMonth() + 1;
+  var day = d.getDate();
 
   var dimension;
   switch (reportType) {
