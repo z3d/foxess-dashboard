@@ -1,5 +1,43 @@
 import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, cachedFetch } from './lib/foxess.js';
 
+// Fetch solar production forecast from forecast.solar (two planes, summed)
+async function fetchSolarForecast() {
+  var planes = [
+    { kwp: 4.44, dec: 22, az: 180 },
+    { kwp: 5.56, dec: 22, az: -90 }
+  ];
+  var lat = -27.5938;
+  var lon = 153.0979;
+  var base = 'https://api.forecast.solar/estimate/watthours/day';
+
+  var results = await Promise.all(planes.map(function(p) {
+    var url = base + '/' + lat + '/' + lon + '/' + p.dec + '/' + p.az + '/' + p.kwp;
+    return fetch(url).then(function(r) { return r.json(); });
+  }));
+
+  // Each result.result is { "YYYY-MM-DD": watt_hours, ... }
+  var totals = {};
+  for (var i = 0; i < results.length; i++) {
+    var data = results[i].result || {};
+    var keys = Object.keys(data);
+    for (var j = 0; j < keys.length; j++) {
+      var day = keys[j];
+      totals[day] = (totals[day] || 0) + data[day];
+    }
+  }
+
+  // Get today and tomorrow dates
+  var now = new Date();
+  var todayStr = now.toISOString().substring(0, 10);
+  var tmrw = new Date(now.getTime() + 86400000);
+  var tmrwStr = tmrw.toISOString().substring(0, 10);
+
+  return {
+    today: Math.round((totals[todayStr] || 0) / 100) / 10,
+    tomorrow: Math.round((totals[tmrwStr] || 0) / 100) / 10
+  };
+}
+
 export default {
   async fetch(request, env) {
     var url = new URL(request.url);
@@ -59,6 +97,15 @@ export default {
             headers: { 'Content-Type': 'application/json' }
           });
         }
+
+      } else if (path === '/api/solar-forecast') {
+        var cached3 = await cachedFetch('solar-forecast', function() {
+          return fetchSolarForecast();
+        }, 3600);
+        var body3 = await cached3.text();
+        response = new Response(body3, {
+          headers: { 'Content-Type': 'application/json' }
+        });
 
       } else {
         response = new Response(JSON.stringify({ error: 'Not Found' }), {

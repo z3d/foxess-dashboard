@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.8.0">
+  <meta name="app-version" content="1.9.0">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -248,6 +248,12 @@
     .dewpoint-uncomfortable { color: #fb923c; }
     .dewpoint-humid { color: #f87171; }
     .dewpoint-oppressive { color: #dc2626; }
+
+    /* Solar forecast tiers */
+    .solar-tier-excellent { color: #4ade80; }
+    .solar-tier-good { color: #a3e635; }
+    .solar-tier-fair { color: #fbbf24; }
+    .solar-tier-poor { color: #f87171; }
 
     .battery-visual {
       position: relative;
@@ -774,6 +780,8 @@
             <div class="weather-item">
               <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--°C</span><span class="dewpoint-emoji" id="dewpointEmoji"></span>
             </div>
+            <div class="weather-item" id="solarForecastToday" style="display:none"><span class="weather-label">Fcst</span><span id="solarFcstTodayVal"></span> <span id="solarFcstTodayTier"></span></div>
+            <div class="weather-item" id="solarForecastTmrw" style="display:none"><span class="weather-label">Tmrw</span><span id="solarFcstTmrwVal"></span> <span id="solarFcstTmrwTier"></span></div>
             <div class="weather-item" id="sunEvent" style="display:none"><span class="weather-label" id="sunLabel"></span><span id="sunTime"></span></div>
           </div>
         </div>
@@ -934,6 +942,12 @@
         elements.weatherHumidity = document.getElementById('weatherHumidity');
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
         elements.dewpointEmoji = document.getElementById('dewpointEmoji');
+        elements.solarForecastToday = document.getElementById('solarForecastToday');
+        elements.solarFcstTodayVal = document.getElementById('solarFcstTodayVal');
+        elements.solarFcstTodayTier = document.getElementById('solarFcstTodayTier');
+        elements.solarForecastTmrw = document.getElementById('solarForecastTmrw');
+        elements.solarFcstTmrwVal = document.getElementById('solarFcstTmrwVal');
+        elements.solarFcstTmrwTier = document.getElementById('solarFcstTmrwTier');
         elements.sunEvent = document.getElementById('sunEvent');
         elements.sunLabel = document.getElementById('sunLabel');
         elements.sunTime = document.getElementById('sunTime');
@@ -1315,6 +1329,43 @@
         var days = Math.floor(hours / 24);
         var remainHrs = hours % 24;
         return days + 'd ' + remainHrs + 'h ago';
+      }
+
+      function getSolarTier(kwh) {
+        if (kwh >= 30) return { label: 'Excellent', cls: 'solar-tier-excellent' };
+        if (kwh >= 22) return { label: 'Good', cls: 'solar-tier-good' };
+        if (kwh >= 14) return { label: 'Fair', cls: 'solar-tier-fair' };
+        return { label: 'Poor', cls: 'solar-tier-poor' };
+      }
+
+      function fetchSolarForecast() {
+        var baseUrl = config.workerUrl || window.location.origin;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', baseUrl + '/api/solar-forecast', true);
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+              var data = JSON.parse(xhr.responseText);
+              if (data.today !== undefined) {
+                var todayTier = getSolarTier(data.today);
+                elements.solarFcstTodayVal.textContent = data.today + ' kWh';
+                elements.solarFcstTodayTier.textContent = todayTier.label;
+                elements.solarFcstTodayTier.className = todayTier.cls;
+                elements.solarForecastToday.style.display = '';
+              }
+              if (data.tomorrow !== undefined) {
+                var tmrwTier = getSolarTier(data.tomorrow);
+                elements.solarFcstTmrwVal.textContent = data.tomorrow + ' kWh';
+                elements.solarFcstTmrwTier.textContent = tmrwTier.label;
+                elements.solarFcstTmrwTier.className = tmrwTier.cls;
+                elements.solarForecastTmrw.style.display = '';
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        };
+        xhr.send();
       }
 
       function updateStaleBanner(data) {
@@ -1786,6 +1837,8 @@
         setInterval(updateClock, 1000);
         fetchWeather();
         setInterval(fetchWeather, 600000); // Update weather every 10 minutes
+        fetchSolarForecast();
+        setInterval(fetchSolarForecast, 3600000); // Update solar forecast every hour
       }
 
       // Register service worker for offline support (standalone/home-screen mode)
