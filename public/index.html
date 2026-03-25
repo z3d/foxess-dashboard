@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.10.0">
+  <meta name="app-version" content="1.10.1">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1347,10 +1347,13 @@
 
       function saveCalibration(cal) {
         try {
-          // Prune entries older than 30 days
+          // Prune entries older than 30 days (use local date to match stored keys)
           var cutoff = new Date();
           cutoff.setDate(cutoff.getDate() - 30);
-          var cutoffStr = cutoff.toISOString().substring(0, 10);
+          var cy = cutoff.getFullYear();
+          var cm = cutoff.getMonth() + 1;
+          var cd = cutoff.getDate();
+          var cutoffStr = cy + '-' + (cm < 10 ? '0' : '') + cm + '-' + (cd < 10 ? '0' : '') + cd;
           var keys = Object.keys(cal);
           for (var i = 0; i < keys.length; i++) {
             if (keys[i] < cutoffStr) delete cal[keys[i]];

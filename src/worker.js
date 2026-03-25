@@ -26,10 +26,10 @@ async function fetchSolarForecast() {
     }
   }
 
-  // Get today and tomorrow dates
-  var now = new Date();
-  var todayStr = now.toISOString().substring(0, 10);
-  var tmrw = new Date(now.getTime() + 86400000);
+  // Get today and tomorrow dates in AEST (UTC+10)
+  var nowAest = new Date(Date.now() + 10 * 3600000);
+  var todayStr = nowAest.toISOString().substring(0, 10);
+  var tmrw = new Date(nowAest.getTime() + 86400000);
   var tmrwStr = tmrw.toISOString().substring(0, 10);
 
   return {
@@ -107,17 +107,20 @@ export default {
         } else {
           // Default to yesterday in AEST (UTC+10)
           var dateParam = url.searchParams.get('date');
+          var dateKey;
           var genDate;
-          if (dateParam) {
+          if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+            // Use the date string directly as the key; parse as UTC for the API call
+            dateKey = dateParam;
             var parts = dateParam.split('-');
-            genDate = new Date(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2]));
+            genDate = new Date(Date.UTC(parseInt(parts[0]), parseInt(parts[1]) - 1, parseInt(parts[2])));
           } else {
-            var nowAest = new Date(Date.now() + 10 * 3600000);
-            genDate = new Date(nowAest.getTime() - 86400000);
+            // Default to yesterday in AEST (UTC+10)
+            var nowAest2 = new Date(Date.now() + 10 * 3600000);
+            var yest = new Date(nowAest2.getTime() - 86400000);
+            dateKey = yest.toISOString().substring(0, 10);
+            genDate = new Date(Date.UTC(parseInt(dateKey.substring(0, 4)), parseInt(dateKey.substring(5, 7)) - 1, parseInt(dateKey.substring(8, 10))));
           }
-          var dateKey = genDate.getFullYear() + '-' +
-            (genDate.getMonth() + 1 < 10 ? '0' : '') + (genDate.getMonth() + 1) + '-' +
-            (genDate.getDate() < 10 ? '0' : '') + genDate.getDate();
           var cached4 = await cachedFetch('daily-gen-' + dateKey, function() {
             return fetchReportData(env, 'day', genDate).then(function(data) {
               var total = 0;
