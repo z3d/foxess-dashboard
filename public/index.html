@@ -71,7 +71,7 @@
     }
 
     .header-time {
-      font-size: 2.5em;
+      font-size: 1.8em;
       font-weight: 600;
       color: #fff;
     }
@@ -1477,31 +1477,6 @@
         xhr.send();
       }
 
-      function fetchTodayProduction() {
-        var baseUrl = config.workerUrl || window.location.origin;
-        var nowAest = new Date(Date.now() + 10 * 3600000);
-        var today = nowAest.toISOString().substring(0, 10);
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', baseUrl + '/api/daily-generation?date=' + today, true);
-        if (config.apiKey) {
-          xhr.setRequestHeader('X-API-Key', config.apiKey);
-        }
-        xhr.onreadystatechange = function() {
-          if (xhr.readyState === 4 && xhr.status === 200) {
-            try {
-              var data = JSON.parse(xhr.responseText);
-              if (data.generation !== undefined) {
-                elements.solarProductionVal.textContent = formatNumber(data.generation, 1);
-                elements.solarProductionRow.style.display = '';
-              }
-            } catch (e) {
-              // Ignore errors
-            }
-          }
-        };
-        xhr.send();
-      }
-
       function updateStaleBanner(data) {
         var banner = elements.staleBanner;
         if (!data || !data.result || !data.result[0]) {
@@ -1678,6 +1653,15 @@
         elements.loadPower.textContent = formatNumber(loadsPower, 2);
         elements.gridExport.textContent = formatNumber(feedinPower, 2);
         elements.gridImport.textContent = formatNumber(gridConsumption, 2);
+
+        // Today's total production from realtime data
+        var todayYield = getVarValue(data, 'todayYield');
+        if (todayYield !== null && todayYield > 0) {
+          elements.solarProductionVal.textContent = formatNumber(todayYield, 1);
+          elements.solarProductionRow.style.display = '';
+        } else {
+          elements.solarProductionRow.style.display = 'none';
+        }
 
         // Update grid import color based on free period
         if (isInFreePeriod()) {
@@ -1973,8 +1957,6 @@
         setInterval(fetchWeather, 600000); // Update weather every 10 minutes
         fetchSolarForecast();
         setInterval(fetchSolarForecast, 3600000); // Update solar forecast every hour
-        fetchTodayProduction();
-        setInterval(fetchTodayProduction, 300000); // Update production every 5 minutes
       }
 
       // Register service worker for offline support (standalone/home-screen mode)

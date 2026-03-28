@@ -214,7 +214,8 @@ export async function fetchRealtimeData(env) {
     'feedinPower',
     'gridConsumptionPower',
     'batTemperature',
-    'RVolt'
+    'RVolt',
+    'todayYield'
   ];
 
   var body = {
