@@ -1656,6 +1656,9 @@
 
         // Today's total production from realtime data
         var todayYield = getVarValue(data, 'todayYield');
+        if (todayYield === null) todayYield = getVarValue(data, 'generationToday');
+        if (todayYield === null) todayYield = getVarValue(data, 'todayGeneration');
+        console.log('[debug] todayYield:', todayYield, 'all vars:', JSON.stringify((data && data.result && data.result[0] && data.result[0].datas) ? data.result[0].datas.map(function(d) { return d.variable; }) : []));
         if (todayYield !== null && todayYield > 0) {
           elements.solarProductionVal.textContent = formatNumber(todayYield, 1);
           elements.solarProductionRow.style.display = '';
