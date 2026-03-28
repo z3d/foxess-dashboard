@@ -121,6 +121,9 @@ export default {
             dateKey = yest.toISOString().substring(0, 10);
             genDate = new Date(Date.UTC(parseInt(dateKey.substring(0, 4)), parseInt(dateKey.substring(5, 7)) - 1, parseInt(dateKey.substring(8, 10))));
           }
+          // Use short TTL for today (data still accumulating), long TTL for past dates
+          var nowAestDate = new Date(Date.now() + 10 * 3600000).toISOString().substring(0, 10);
+          var genTtl = (dateKey === nowAestDate) ? 300 : 21600;
           var cached4 = await cachedFetch('daily-gen-' + dateKey, function() {
             return fetchReportData(env, 'day', genDate).then(function(data) {
               var total = 0;
@@ -136,7 +139,7 @@ export default {
               }
               return { date: dateKey, generation: Math.round(total * 10) / 10 };
             });
-          }, 21600);
+          }, genTtl);
           var body4 = await cached4.text();
           response = new Response(body4, {
             headers: { 'Content-Type': 'application/json' }

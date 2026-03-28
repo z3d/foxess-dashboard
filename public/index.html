@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.10.1">
+  <meta name="app-version" content="1.11.1">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -780,7 +780,8 @@
             <div class="weather-item">
               <span class="weather-label">Dew Point</span><span class="dewpoint-value" id="weatherDewpoint">--°C</span><span class="dewpoint-emoji" id="dewpointEmoji"></span>
             </div>
-            <div class="weather-item" id="solarForecastRow" style="display:none"><span class="weather-label">Fcst</span><span id="solarFcstTodayVal"></span> <span id="solarFcstTodayTier"></span><span id="solarFcstTmrwWrap"> / <span id="solarFcstTmrwVal"></span> <span id="solarFcstTmrwTier"></span></span></div>
+            <div class="weather-item" id="solarProductionRow" style="display:none"><span class="weather-label">Produced</span><span id="solarProductionVal">--</span><span style="font-size:0.75em">kWh</span></div>
+            <div class="weather-item" id="solarForecastRow" style="display:none"><span class="weather-label">Fcst</span><span id="solarFcstTodayLabel">Today </span><span id="solarFcstTodayVal"></span><span style="font-size:0.75em">kWh</span> <span id="solarFcstTodayTier"></span><span id="solarFcstTmrwWrap"> / Tmrw <span id="solarFcstTmrwVal"></span><span style="font-size:0.75em">kWh</span> <span id="solarFcstTmrwTier"></span></span></div>
             <div class="weather-item" id="sunEvent" style="display:none"><span class="weather-label" id="sunLabel"></span><span id="sunTime"></span></div>
           </div>
         </div>
@@ -941,6 +942,8 @@
         elements.weatherHumidity = document.getElementById('weatherHumidity');
         elements.weatherDewpoint = document.getElementById('weatherDewpoint');
         elements.dewpointEmoji = document.getElementById('dewpointEmoji');
+        elements.solarProductionRow = document.getElementById('solarProductionRow');
+        elements.solarProductionVal = document.getElementById('solarProductionVal');
         elements.solarForecastRow = document.getElementById('solarForecastRow');
         elements.solarFcstTodayVal = document.getElementById('solarFcstTodayVal');
         elements.solarFcstTodayTier = document.getElementById('solarFcstTodayTier');
@@ -1331,10 +1334,10 @@
       }
 
       function getSolarTier(kwh) {
-        if (kwh >= 30) return { label: 'Excellent', cls: 'solar-tier-excellent' };
-        if (kwh >= 22) return { label: 'Good', cls: 'solar-tier-good' };
-        if (kwh >= 14) return { label: 'Fair', cls: 'solar-tier-fair' };
-        return { label: 'Poor', cls: 'solar-tier-poor' };
+        if (kwh >= 30) return { emoji: '☀️', cls: 'solar-tier-excellent' };
+        if (kwh >= 22) return { emoji: '🌤️', cls: 'solar-tier-good' };
+        if (kwh >= 14) return { emoji: '⛅', cls: 'solar-tier-fair' };
+        return { emoji: '🌧️', cls: 'solar-tier-poor' };
       }
 
       // Solar forecast calibration: compare forecast vs actual over time
@@ -1451,18 +1454,45 @@
               if (adjToday > 0) {
                 var todayTier = getSolarTier(adjToday);
                 elements.solarFcstTodayVal.textContent = adjToday;
-                elements.solarFcstTodayTier.textContent = todayTier.label;
-                elements.solarFcstTodayTier.className = todayTier.cls;
+                elements.solarFcstTodayVal.className = todayTier.cls;
+                elements.solarFcstTodayTier.textContent = todayTier.emoji;
+                elements.solarFcstTodayTier.className = '';
                 elements.solarForecastRow.style.display = '';
               }
               if (adjTmrw > 0) {
                 var tmrwTier = getSolarTier(adjTmrw);
                 elements.solarFcstTmrwVal.textContent = adjTmrw;
-                elements.solarFcstTmrwTier.textContent = tmrwTier.label;
-                elements.solarFcstTmrwTier.className = tmrwTier.cls;
+                elements.solarFcstTmrwVal.className = tmrwTier.cls;
+                elements.solarFcstTmrwTier.textContent = tmrwTier.emoji;
+                elements.solarFcstTmrwTier.className = '';
                 elements.solarFcstTmrwWrap.style.display = '';
               } else {
                 elements.solarFcstTmrwWrap.style.display = 'none';
+              }
+            } catch (e) {
+              // Ignore errors
+            }
+          }
+        };
+        xhr.send();
+      }
+
+      function fetchTodayProduction() {
+        var baseUrl = config.workerUrl || window.location.origin;
+        var nowAest = new Date(Date.now() + 10 * 3600000);
+        var today = nowAest.toISOString().substring(0, 10);
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', baseUrl + '/api/daily-generation?date=' + today, true);
+        if (config.apiKey) {
+          xhr.setRequestHeader('X-API-Key', config.apiKey);
+        }
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+              var data = JSON.parse(xhr.responseText);
+              if (data.generation !== undefined) {
+                elements.solarProductionVal.textContent = formatNumber(data.generation, 1);
+                elements.solarProductionRow.style.display = '';
               }
             } catch (e) {
               // Ignore errors
@@ -1943,6 +1973,8 @@
         setInterval(fetchWeather, 600000); // Update weather every 10 minutes
         fetchSolarForecast();
         setInterval(fetchSolarForecast, 3600000); // Update solar forecast every hour
+        fetchTodayProduction();
+        setInterval(fetchTodayProduction, 300000); // Update production every 5 minutes
       }
 
       // Register service worker for offline support (standalone/home-screen mode)
