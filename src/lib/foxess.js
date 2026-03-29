@@ -272,13 +272,17 @@ export async function fetchReportData(env, reportType, dateObj) {
     day: day
   };
 
+  var reqBody = JSON.stringify(body);
+  console.log('[report] request:', reqBody);
   var response = await fetch(FOXESS_API_BASE + path, {
     method: 'POST',
     headers: headers,
-    body: JSON.stringify(body)
+    body: reqBody
   });
 
-  return response.json();
+  var result = await response.json();
+  console.log('[report] response errno:', result.errno);
+  return result;
 }
 
 // Module-level cache: persists across requests within the same isolate
