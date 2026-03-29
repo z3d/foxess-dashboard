@@ -129,10 +129,12 @@ export default {
               var total = 0;
               if (data && data.result) {
                 for (var g = 0; g < data.result.length; g++) {
-                  if (data.result[g].variable === 'generation' && data.result[g].data) {
-                    var pts = data.result[g].data;
+                  var item = data.result[g];
+                  if (item.variable === 'generation') {
+                    var pts = item.values || item.data || [];
                     for (var h = 0; h < pts.length; h++) {
-                      total += pts[h].value || 0;
+                      var v = (typeof pts[h] === 'number') ? pts[h] : (pts[h].value || 0);
+                      total += v;
                     }
                   }
                 }
