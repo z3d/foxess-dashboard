@@ -126,20 +126,19 @@ export default {
           var genTtl = (dateKey === nowAestDate) ? 300 : 21600;
           var cached4 = await cachedFetch('daily-gen-' + dateKey, function() {
             return fetchReportData(env, 'day', genDate).then(function(data) {
-              var total = 0;
+              var pvTotal = 0;
               if (data && data.result) {
                 for (var g = 0; g < data.result.length; g++) {
                   var item = data.result[g];
-                  if (item.variable === 'generation') {
+                  if (item.variable === 'PVEnergyTotal') {
                     var pts = item.values || item.data || [];
                     for (var h = 0; h < pts.length; h++) {
-                      var v = (typeof pts[h] === 'number') ? pts[h] : (pts[h].value || 0);
-                      total += v;
+                      pvTotal += (typeof pts[h] === 'number') ? pts[h] : (pts[h].value || 0);
                     }
                   }
                 }
               }
-              return { date: dateKey, generation: Math.round(total * 10) / 10 };
+              return { date: dateKey, generation: Math.round(pvTotal * 10) / 10 };
             });
           }, genTtl);
           var body4 = await cached4.text();

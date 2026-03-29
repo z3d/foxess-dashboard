@@ -260,7 +260,8 @@ export async function fetchReportData(env, reportType, dateObj) {
     'feedin',
     'gridConsumption',
     'chargeEnergyToTal',
-    'dischargeEnergyToTal'
+    'dischargeEnergyToTal',
+    'PVEnergyTotal'
   ];
 
   var body = {
