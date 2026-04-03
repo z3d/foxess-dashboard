@@ -26,8 +26,11 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 
 ```
 ├── wrangler.jsonc          # Worker configuration
+├── setup.js                # Interactive setup wizard
 ├── public/
 │   ├── index.html          # Dashboard frontend
+│   ├── sw.js               # Service worker (offline support)
+│   ├── manifest.webmanifest # Web app manifest
 │   └── robots.txt
 └── src/
     ├── worker.js           # Worker entry point (API routing)
@@ -40,48 +43,51 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - FoxESS Cloud account with API access
 - Cloudflare account (free tier works)
 
-## Setup Instructions
+## Quick Start
 
-### 1. Get Your FoxESS API Key
+The easiest way to get up and running is the interactive setup wizard:
 
-1. Log in to [FoxESS Cloud](https://www.foxesscloud.com)
-2. Go to **User Profile** → **API Management**
-3. Click **Generate API Key**
-4. Copy and save your API key securely
-5. Note your inverter's **Serial Number** (found in Device List)
+```bash
+npm run setup
+```
 
-### 2. Deploy to Cloudflare
+This will:
+1. Install dependencies (if needed)
+2. Walk you through entering your FoxESS API key and device serial number
+3. Generate a secure dashboard API key (or let you set your own)
+4. Write local dev config (`.dev.vars`)
+5. Optionally deploy to Cloudflare and set all secrets automatically
 
-#### Option A: Git Integration (Recommended)
+After setup, use these commands:
 
-1. Push this repo to GitHub
-2. In [Cloudflare Dashboard](https://dash.cloudflare.com), go to **Workers & Pages** → **Create** → **Import a repository**
-3. Connect your GitHub repo
-4. Set the deploy command to: `npx wrangler deploy`
-5. Deploy — pushes to `master` will auto-deploy
+```bash
+npm run dev      # Start local dev server at http://localhost:8787
+npm run deploy   # Deploy to Cloudflare
+```
 
-#### Option B: Wrangler CLI
+### Prerequisites
 
-1. Install Wrangler:
-   ```bash
-   npm install -g wrangler
+Before running setup, have these ready:
+1. **FoxESS API Key** — Log in to [FoxESS Cloud](https://www.foxesscloud.com) → **User Profile** → **API Management** → **Generate API Key**
+2. **Device Serial Number** — Found in FoxESS Cloud → **Device List**
+3. **Cloudflare account** (free tier works) — only needed if deploying
+
+### Manual Setup
+
+If you prefer to configure manually instead of using the wizard:
+
+1. Copy `.dev.vars.example` or create `.dev.vars`:
+   ```
+   FOXESS_API_KEY=your-foxess-api-key
+   FOXESS_DEVICE_SN=your-device-serial
+   API_KEY=your-dashboard-secret
+   ALLOWED_ORIGIN=*
+   CACHE_TTL=60
    ```
 
-2. Login to Cloudflare:
-   ```bash
-   wrangler login
-   ```
+2. Deploy with `npx wrangler login && npx wrangler deploy`
 
-3. Deploy:
-   ```bash
-   wrangler deploy
-   ```
-
-4. Note your worker URL: `https://<your-worker>.<your-subdomain>.workers.dev`
-
-### 3. Set Environment Variables
-
-In **Cloudflare Dashboard > Workers & Pages > your worker > Settings > Variables and Secrets**, add:
+3. Set secrets in **Cloudflare Dashboard > Workers & Pages > your worker > Settings > Variables and Secrets**:
 
 | Variable | Required | Description |
 |----------|----------|-------------|

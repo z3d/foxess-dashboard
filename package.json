@@ -1,0 +1,12 @@
+{
+  "name": "foxess-dashboard",
+  "private": true,
+  "scripts": {
+    "setup": "node setup.js",
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "devDependencies": {
+    "wrangler": "^3.0.0"
+  }
+}
