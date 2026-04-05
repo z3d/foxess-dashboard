@@ -1875,6 +1875,7 @@
 
         chargePower = chargePower || 0;
         dischargePower = dischargePower || 0;
+        isForceDischarging = dischargePower > 0.05;
 
         elements.batteryStatus.className = 'battery-status';
         elements.batteryTime.className = 'battery-time hidden';
@@ -1998,53 +1999,6 @@
         updateCutoffUI(soc);
       }
 
-      function fetchSchedulerStatus() {
-        if (!config.workerUrl || !config.apiKey || !config.dischargeCutoffEnabled) return;
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', config.workerUrl + '/api/battery/scheduler', true);
-        xhr.setRequestHeader('X-API-Key', config.apiKey);
-        xhr.onreadystatechange = function() {
-          if (xhr.readyState === 4 && xhr.status === 200) {
-            try {
-              var resp = JSON.parse(xhr.responseText);
-              if (resp.errno === 0 && resp.result) {
-                // Check if any active time period is force discharge
-                var groups = resp.result.groups || [];
-                var now = new Date();
-                var currentHour = now.getHours();
-                var currentMin = now.getMinutes();
-                var nowMins = currentHour * 60 + currentMin;
-                var found = false;
-                for (var i = 0; i < groups.length; i++) {
-                  var g = groups[i];
-                  if (!g.enable) continue;
-                  var startH = g.startHour !== undefined ? g.startHour : 0;
-                  var startM = g.startMinute !== undefined ? g.startMinute : 0;
-                  var endH = g.endHour !== undefined ? g.endHour : 0;
-                  var endM = g.endMinute !== undefined ? g.endMinute : 0;
-                  var startMins = startH * 60 + startM;
-                  var endMins = endH * 60 + endM;
-                  var inWindow = false;
-                  if (endMins > startMins) {
-                    inWindow = nowMins >= startMins && nowMins < endMins;
-                  } else if (endMins < startMins) {
-                    inWindow = nowMins >= startMins || nowMins < endMins;
-                  }
-                  if (inWindow && g.workMode === 'ForceDischarge') {
-                    found = true;
-                    break;
-                  }
-                }
-                isForceDischarging = found;
-              }
-            } catch (e) {
-              // Ignore parse errors
-            }
-          }
-        };
-        xhr.send();
-      }
-
       function sendDischargeCutoff(action) {
         var xhr = new XMLHttpRequest();
         xhr.open('POST', config.workerUrl + '/api/battery/discharge-cutoff', true);
@@ -2159,7 +2113,6 @@
         refreshTimer = setInterval(function() {
           nextRefreshTime = Date.now() + intervalMs;
           fetchData();
-          fetchSchedulerStatus();
         }, intervalMs);
         countdownTimer = setInterval(updateCountdown, 1000);
       }
@@ -2388,7 +2341,6 @@
         updateWeatherVisibility();
         initSettings();
         fetchData();
-        fetchSchedulerStatus();
         startAutoRefresh();
         updateClock();
         setInterval(updateClock, 1000);

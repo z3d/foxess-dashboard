@@ -1,4 +1,4 @@
-import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, cachedFetch, getSchedulerSettings, setSchedulerFlag } from './lib/foxess.js';
+import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, cachedFetch, getSchedulerFlag, setSchedulerFlag } from './lib/foxess.js';
 
 // Fetch solar production forecast from forecast.solar (two planes, summed)
 async function fetchSolarForecast() {
@@ -165,7 +165,7 @@ export default {
         } else {
           var schedTtl = parseInt(env.CACHE_TTL) || 120;
           var cachedSched = await cachedFetch('scheduler', function() {
-            return getSchedulerSettings(env);
+            return getSchedulerFlag(env);
           }, schedTtl);
           var schedBody = await cachedSched.text();
           response = new Response(schedBody, {

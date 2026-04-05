@@ -282,13 +282,13 @@ export async function fetchReportData(env, reportType, dateObj) {
   return response.json();
 }
 
-// Fetch scheduler settings from FoxESS
-export async function getSchedulerSettings(env) {
-  var path = '/op/v0/device/scheduler/get';
+// Check if scheduler is enabled on the inverter
+export async function getSchedulerFlag(env) {
+  var path = '/op/v0/device/scheduler/get/flag';
   var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
 
   var body = {
-    sn: env.FOXESS_DEVICE_SN
+    deviceSN: env.FOXESS_DEVICE_SN
   };
 
   var response = await fetch(FOXESS_API_BASE + path, {
@@ -306,7 +306,7 @@ export async function setSchedulerFlag(env, enable) {
   var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
 
   var body = {
-    sn: env.FOXESS_DEVICE_SN,
+    deviceSN: env.FOXESS_DEVICE_SN,
     enable: enable
   };
 
