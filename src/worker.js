@@ -43,6 +43,15 @@ export default {
     var url = new URL(request.url);
     var path = url.pathname;
 
+    // Serve sw.js with no-cache headers so updates propagate immediately
+    if (path === '/sw.js') {
+      var swResp = await env.ASSETS.fetch(request);
+      var swHeaders = new Headers(swResp.headers);
+      swHeaders.set('Cache-Control', 'no-cache, no-store, must-revalidate');
+      swHeaders.set('Service-Worker-Allowed', '/');
+      return new Response(swResp.body, { status: swResp.status, headers: swHeaders });
+    }
+
     // Only handle /api/* routes; static assets served automatically
     if (!path.startsWith('/api/')) {
       return env.ASSETS.fetch(request);
