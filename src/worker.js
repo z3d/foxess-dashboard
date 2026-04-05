@@ -190,12 +190,27 @@ export default {
             headers: { 'Content-Type': 'application/json' }
           });
         } else {
-          var cutoffBody = await request.json();
-          var enableScheduler = cutoffBody.action !== 'activate';
-          var cutoffResult = await setSchedulerFlag(env, enableScheduler);
-          response = new Response(JSON.stringify(cutoffResult), {
-            headers: { 'Content-Type': 'application/json' }
-          });
+          try {
+            var cutoffText = await request.text();
+            if (!cutoffText) {
+              response = new Response(JSON.stringify({ error: 'empty body', method: request.method }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            } else {
+              var cutoffBody = JSON.parse(cutoffText);
+              var enableScheduler = cutoffBody.action !== 'activate';
+              var cutoffResultRaw = await setSchedulerFlag(env, enableScheduler);
+              response = new Response(JSON.stringify(cutoffResultRaw), {
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
+          } catch (cutoffErr) {
+            response = new Response(JSON.stringify({ error: 'discharge-cutoff: ' + cutoffErr.message }), {
+              status: 500,
+              headers: { 'Content-Type': 'application/json' }
+            });
+          }
         }
 
       } else {

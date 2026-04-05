@@ -316,7 +316,15 @@ export async function setSchedulerFlag(env, enable) {
     body: JSON.stringify(body)
   });
 
-  return response.json();
+  var text = await response.text();
+  if (!text) {
+    return { errno: response.ok ? 0 : -1, status: response.status };
+  }
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    return { errno: -1, error: 'Invalid response from FoxESS', status: response.status, body: text.substring(0, 200) };
+  }
 }
 
 // Module-level cache: persists across requests within the same isolate
