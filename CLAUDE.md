@@ -88,6 +88,8 @@ All defined in `src/worker.js`:
 | `GET /api/health` | No | Returns `{"status":"ok","timestamp":...}` |
 | `GET/POST /api/realtime` | Yes (`X-API-Key` header) | Real-time inverter data from FoxESS |
 | `GET/POST /api/report?type=day` | Yes (`X-API-Key` header) | Energy report data from FoxESS |
+| `GET /api/battery/scheduler` | Yes (`X-API-Key` header) | Current scheduler config from FoxESS (cached) |
+| `POST /api/battery/discharge-cutoff` | Yes (`X-API-Key` header) | Enable/disable scheduler to stop force discharge |
 
 ## Deployment
 

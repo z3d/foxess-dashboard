@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.13.0">
+  <meta name="app-version" content="1.14.0">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -379,6 +379,22 @@
       margin-top: 6px;
       font-size: 0.75em;
       color: #666;
+    }
+
+    .cutoff-btn {
+      margin-top: 8px;
+      padding: 6px 12px;
+      border: none;
+      border-radius: 6px;
+      background: #f59e0b;
+      color: #000;
+      font-weight: 600;
+      font-size: 0.75em;
+      cursor: pointer;
+    }
+    .cutoff-btn.active {
+      background: #22c55e;
+      color: #fff;
     }
 
     .battery-time.charging {
@@ -1034,6 +1050,7 @@
             <div class="battery-status idle" id="batteryStatus">Loading...</div>
             <div class="battery-time hidden" id="batteryTime"></div>
             <div class="battery-details" id="batteryDetails">--</div>
+            <button class="cutoff-btn" id="dischargeCutoffBtn" style="display:none;">Stop Discharge</button>
           </div>
         </div>
         <div class="weather-panel" id="weatherPanel">
@@ -1140,6 +1157,16 @@
           Use 24-hour Clock
         </label>
       </div>
+      <div class="settings-group">
+        <label class="checkbox-label">
+          <input type="checkbox" id="dischargeCutoffEnabled">
+          Enable Discharge Cutoff
+        </label>
+      </div>
+      <div class="settings-group">
+        <label for="dischargeCutoffThreshold">Discharge Cutoff SoC (%)</label>
+        <input type="number" id="dischargeCutoffThreshold" value="50" min="5" max="95" step="1">
+      </div>
       <button class="settings-save" id="settingsSave">Save Settings</button>
       <div style="display:-webkit-box;display:-webkit-flex;display:flex;gap:10px;margin-top:10px;">
         <button type="button" class="btn" id="exportSettings" style="-webkit-box-flex:1;flex:1;">Export Settings</button>
@@ -1171,13 +1198,17 @@
         batteryReserve: 10,
         use24hClock: false,
         chargeCutoffHours: 2.5,
-        freePeriods: [{start: 11, end: 14}]
+        freePeriods: [{start: 11, end: 14}],
+        dischargeCutoffEnabled: false,
+        dischargeCutoffThreshold: 50
       };
 
       var refreshTimer = null;
       var countdownTimer = null;
       var nextRefreshTime = 0;
       var lastSuccessfulUpdate = null;
+      var dischargeCutoffActive = false;
+      var isForceDischarging = false;
       var todaySunsetUnix = null;
       var elements = {};
 
@@ -1230,6 +1261,9 @@
         elements.freePeriodsContainer = document.getElementById('freePeriodsContainer');
         elements.addFreePeriod = document.getElementById('addFreePeriod');
         elements.use24hClock = document.getElementById('use24hClock');
+        elements.dischargeCutoffBtn = document.getElementById('dischargeCutoffBtn');
+        elements.dischargeCutoffEnabled = document.getElementById('dischargeCutoffEnabled');
+        elements.dischargeCutoffThreshold = document.getElementById('dischargeCutoffThreshold');
       }
 
       function loadConfig() {
@@ -1249,6 +1283,8 @@
             config.chargeCutoffHours = parsed.chargeCutoffHours !== undefined ? parsed.chargeCutoffHours : 2.5;
             config.use24hClock = parsed.use24hClock !== undefined ? parsed.use24hClock : false;
             config.freePeriods = parsed.freePeriods || [{start: 11, end: 14}];
+            config.dischargeCutoffEnabled = parsed.dischargeCutoffEnabled !== undefined ? parsed.dischargeCutoffEnabled : false;
+            config.dischargeCutoffThreshold = parsed.dischargeCutoffThreshold !== undefined ? parsed.dischargeCutoffThreshold : 50;
           }
         } catch (e) {
           // Ignore errors
@@ -1950,6 +1986,107 @@
         } else {
           elements.gridImportCard.className = 'stat-card grid-import';
         }
+
+        // Discharge cutoff: auto-trigger + button visibility
+        if (config.dischargeCutoffEnabled && soc !== null && isForceDischarging) {
+          if (soc <= config.dischargeCutoffThreshold && !dischargeCutoffActive) {
+            sendDischargeCutoff('activate');
+          } else if (soc > config.dischargeCutoffThreshold + 5 && dischargeCutoffActive) {
+            sendDischargeCutoff('deactivate');
+          }
+        }
+        updateCutoffUI(soc);
+      }
+
+      function fetchSchedulerStatus() {
+        if (!config.workerUrl || !config.apiKey || !config.dischargeCutoffEnabled) return;
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', config.workerUrl + '/api/battery/scheduler', true);
+        xhr.setRequestHeader('X-API-Key', config.apiKey);
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4 && xhr.status === 200) {
+            try {
+              var resp = JSON.parse(xhr.responseText);
+              if (resp.errno === 0 && resp.result) {
+                // Check if any active time period is force discharge
+                var groups = resp.result.groups || [];
+                var now = new Date();
+                var currentHour = now.getHours();
+                var currentMin = now.getMinutes();
+                var nowMins = currentHour * 60 + currentMin;
+                var found = false;
+                for (var i = 0; i < groups.length; i++) {
+                  var g = groups[i];
+                  if (!g.enable) continue;
+                  var startH = g.startHour !== undefined ? g.startHour : 0;
+                  var startM = g.startMinute !== undefined ? g.startMinute : 0;
+                  var endH = g.endHour !== undefined ? g.endHour : 0;
+                  var endM = g.endMinute !== undefined ? g.endMinute : 0;
+                  var startMins = startH * 60 + startM;
+                  var endMins = endH * 60 + endM;
+                  var inWindow = false;
+                  if (endMins > startMins) {
+                    inWindow = nowMins >= startMins && nowMins < endMins;
+                  } else if (endMins < startMins) {
+                    inWindow = nowMins >= startMins || nowMins < endMins;
+                  }
+                  if (inWindow && g.workMode === 'ForceDischarge') {
+                    found = true;
+                    break;
+                  }
+                }
+                isForceDischarging = found;
+              }
+            } catch (e) {
+              // Ignore parse errors
+            }
+          }
+        };
+        xhr.send();
+      }
+
+      function sendDischargeCutoff(action) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('POST', config.workerUrl + '/api/battery/discharge-cutoff', true);
+        xhr.setRequestHeader('Content-Type', 'application/json');
+        if (config.apiKey) {
+          xhr.setRequestHeader('X-API-Key', config.apiKey);
+        }
+        xhr.onreadystatechange = function() {
+          if (xhr.readyState === 4) {
+            if (xhr.status === 200) {
+              try {
+                var resp = JSON.parse(xhr.responseText);
+                if (resp.errno === 0) {
+                  dischargeCutoffActive = (action === 'activate');
+                  updateCutoffUI(null);
+                }
+              } catch (e) {
+                // Ignore parse errors
+              }
+            }
+          }
+        };
+        xhr.send(JSON.stringify({ action: action }));
+      }
+
+      function updateCutoffUI(soc) {
+        if (!elements.dischargeCutoffBtn) return;
+        if (!config.dischargeCutoffEnabled) {
+          elements.dischargeCutoffBtn.style.display = 'none';
+          return;
+        }
+        if (dischargeCutoffActive) {
+          elements.dischargeCutoffBtn.style.display = '';
+          elements.dischargeCutoffBtn.textContent = 'Resume Discharge';
+          elements.dischargeCutoffBtn.className = 'cutoff-btn active';
+        } else if (isForceDischarging && soc !== null && soc >= config.dischargeCutoffThreshold) {
+          elements.dischargeCutoffBtn.style.display = '';
+          elements.dischargeCutoffBtn.textContent = 'Stop Discharge';
+          elements.dischargeCutoffBtn.className = 'cutoff-btn';
+        } else {
+          elements.dischargeCutoffBtn.style.display = 'none';
+        }
       }
 
       function fetchData() {
@@ -2022,6 +2159,7 @@
         refreshTimer = setInterval(function() {
           nextRefreshTime = Date.now() + intervalMs;
           fetchData();
+          fetchSchedulerStatus();
         }, intervalMs);
         countdownTimer = setInterval(updateCountdown, 1000);
       }
@@ -2078,6 +2216,8 @@
         elements.chargeCutoffHours.value = config.chargeCutoffHours;
         elements.showWeather.checked = config.showWeather;
         elements.use24hClock.checked = config.use24hClock;
+        elements.dischargeCutoffEnabled.checked = config.dischargeCutoffEnabled;
+        elements.dischargeCutoffThreshold.value = config.dischargeCutoffThreshold;
         renderFreePeriods();
         elements.settingsOverlay.className = 'settings-overlay active';
       }
@@ -2116,6 +2256,8 @@
             if (imported.chargeCutoffHours !== undefined) config.chargeCutoffHours = imported.chargeCutoffHours;
             if (imported.use24hClock !== undefined) config.use24hClock = imported.use24hClock;
             if (imported.freePeriods !== undefined) config.freePeriods = imported.freePeriods;
+            if (imported.dischargeCutoffEnabled !== undefined) config.dischargeCutoffEnabled = imported.dischargeCutoffEnabled;
+            if (imported.dischargeCutoffThreshold !== undefined) config.dischargeCutoffThreshold = imported.dischargeCutoffThreshold;
             saveConfig();
             openSettings();
             var importBtn = document.getElementById('importSettings');
@@ -2175,6 +2317,13 @@
           config.freePeriods = collectFreePeriods();
           config.showWeather = elements.showWeather.checked;
           config.use24hClock = elements.use24hClock.checked;
+          var prevCutoffEnabled = config.dischargeCutoffEnabled;
+          config.dischargeCutoffEnabled = elements.dischargeCutoffEnabled.checked;
+          var dct = parseInt(elements.dischargeCutoffThreshold.value, 10);
+          config.dischargeCutoffThreshold = (isNaN(dct) || dct < 5 || dct > 95) ? 50 : dct;
+          if (!config.dischargeCutoffEnabled && prevCutoffEnabled && dischargeCutoffActive) {
+            sendDischargeCutoff('deactivate');
+          }
           saveConfig();
           updateWeatherVisibility();
           updateClock();
@@ -2187,6 +2336,14 @@
         refreshBtn.onclick = function() {
           fetchData();
           startAutoRefresh();
+        };
+
+        elements.dischargeCutoffBtn.onclick = function() {
+          if (dischargeCutoffActive) {
+            sendDischargeCutoff('deactivate');
+          } else {
+            sendDischargeCutoff('activate');
+          }
         };
 
         var exportBtn = document.getElementById('exportSettings');
@@ -2231,6 +2388,7 @@
         updateWeatherVisibility();
         initSettings();
         fetchData();
+        fetchSchedulerStatus();
         startAutoRefresh();
         updateClock();
         setInterval(updateClock, 1000);

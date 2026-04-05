@@ -282,6 +282,43 @@ export async function fetchReportData(env, reportType, dateObj) {
   return response.json();
 }
 
+// Fetch scheduler settings from FoxESS
+export async function getSchedulerSettings(env) {
+  var path = '/op/v0/device/scheduler/get';
+  var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
+
+  var body = {
+    sn: env.FOXESS_DEVICE_SN
+  };
+
+  var response = await fetch(FOXESS_API_BASE + path, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
+  });
+
+  return response.json();
+}
+
+// Enable or disable the scheduler on the inverter
+export async function setSchedulerFlag(env, enable) {
+  var path = '/op/v0/device/scheduler/enable';
+  var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
+
+  var body = {
+    sn: env.FOXESS_DEVICE_SN,
+    enable: enable
+  };
+
+  var response = await fetch(FOXESS_API_BASE + path, {
+    method: 'POST',
+    headers: headers,
+    body: JSON.stringify(body)
+  });
+
+  return response.json();
+}
+
 // Module-level cache: persists across requests within the same isolate
 var _cacheData = {};
 var _cacheTime = {};

@@ -1,4 +1,4 @@
-import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, cachedFetch } from './lib/foxess.js';
+import { corsHeaders, validateApiKey, fetchRealtimeData, fetchReportData, cachedFetch, getSchedulerSettings, setSchedulerFlag } from './lib/foxess.js';
 
 // Fetch solar production forecast from forecast.solar (two planes, summed)
 async function fetchSolarForecast() {
@@ -155,6 +155,38 @@ export default {
         response = new Response(body3, {
           headers: { 'Content-Type': 'application/json' }
         });
+
+      } else if (path === '/api/battery/scheduler') {
+        if (!validateApiKey(request, env)) {
+          response = new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          var schedTtl = parseInt(env.CACHE_TTL) || 120;
+          var cachedSched = await cachedFetch('scheduler', function() {
+            return getSchedulerSettings(env);
+          }, schedTtl);
+          var schedBody = await cachedSched.text();
+          response = new Response(schedBody, {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+
+      } else if (path === '/api/battery/discharge-cutoff') {
+        if (!validateApiKey(request, env)) {
+          response = new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          var cutoffBody = await request.json();
+          var enableScheduler = cutoffBody.action !== 'activate';
+          var cutoffResult = await setSchedulerFlag(env, enableScheduler);
+          response = new Response(JSON.stringify(cutoffResult), {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
 
       } else {
         response = new Response(JSON.stringify({ error: 'Not Found' }), {

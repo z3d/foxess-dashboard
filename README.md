@@ -151,6 +151,8 @@ curl -H "X-API-Key: your-secret-key" https://your-worker.workers.dev/api/realtim
 | `/api/health` | GET | Health check | No |
 | `/api/realtime` | GET/POST | Real-time inverter data | Yes |
 | `/api/report?type=day` | GET/POST | Daily energy report | Yes |
+| `/api/battery/scheduler` | GET | Current scheduler config | Yes |
+| `/api/battery/discharge-cutoff` | POST | Enable/disable scheduler (stop force discharge) | Yes |
 
 ## Troubleshooting
 
