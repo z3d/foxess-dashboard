@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.15.2">
+  <meta name="app-version" content="1.15.3">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1172,6 +1172,16 @@
         <label for="dischargeCutoffAutoThreshold">Auto Stop SoC (%)</label>
         <input type="number" id="dischargeCutoffAutoThreshold" value="50" min="5" max="95" step="1">
       </div>
+      <div class="settings-group">
+        <label>
+          <input type="checkbox" id="autoResumeScheduler" checked>
+          Auto Resume Scheduler
+        </label>
+      </div>
+      <div class="settings-group">
+        <label for="autoResumeTime">Resume At</label>
+        <input type="time" id="autoResumeTime" value="00:00">
+      </div>
       <button class="settings-save" id="settingsSave">Save Settings</button>
       <div style="display:-webkit-box;display:-webkit-flex;display:flex;gap:10px;margin-top:10px;">
         <button type="button" class="btn" id="exportSettings" style="-webkit-box-flex:1;flex:1;">Export Settings</button>
@@ -1206,7 +1216,9 @@
         freePeriods: [{start: 11, end: 14}],
         dischargeCutoffEnabled: false,
         dischargeCutoffThreshold: 55,
-        dischargeCutoffAutoThreshold: 50
+        dischargeCutoffAutoThreshold: 50,
+        autoResumeScheduler: true,
+        autoResumeTime: '00:00'
       };
 
       var refreshTimer = null;
@@ -1271,6 +1283,8 @@
         elements.dischargeCutoffEnabled = document.getElementById('dischargeCutoffEnabled');
         elements.dischargeCutoffThreshold = document.getElementById('dischargeCutoffThreshold');
         elements.dischargeCutoffAutoThreshold = document.getElementById('dischargeCutoffAutoThreshold');
+        elements.autoResumeScheduler = document.getElementById('autoResumeScheduler');
+        elements.autoResumeTime = document.getElementById('autoResumeTime');
       }
 
       function loadConfig() {
@@ -1293,6 +1307,8 @@
             config.dischargeCutoffEnabled = parsed.dischargeCutoffEnabled !== undefined ? parsed.dischargeCutoffEnabled : false;
             config.dischargeCutoffThreshold = parsed.dischargeCutoffThreshold !== undefined ? parsed.dischargeCutoffThreshold : 55;
             config.dischargeCutoffAutoThreshold = parsed.dischargeCutoffAutoThreshold !== undefined ? parsed.dischargeCutoffAutoThreshold : 50;
+            config.autoResumeScheduler = parsed.autoResumeScheduler !== undefined ? parsed.autoResumeScheduler : true;
+            config.autoResumeTime = parsed.autoResumeTime !== undefined ? parsed.autoResumeTime : '00:00';
           }
         } catch (e) {
           // Ignore errors
@@ -2003,6 +2019,18 @@
             sendDischargeCutoff('activate');
           }
         }
+        // Auto-resume scheduler at configured time
+        if (dischargeCutoffActive && config.autoResumeScheduler) {
+          var resumeParts = config.autoResumeTime.split(':');
+          var resumeHour = parseInt(resumeParts[0], 10);
+          var resumeMin = parseInt(resumeParts[1], 10);
+          var now = new Date();
+          var nowMins = now.getHours() * 60 + now.getMinutes();
+          var resumeMins = resumeHour * 60 + resumeMin;
+          if (nowMins >= resumeMins && nowMins < resumeMins + 5) {
+            sendDischargeCutoff('reactivate');
+          }
+        }
         updateCutoffUI(soc);
       }
 
@@ -2038,9 +2066,13 @@
           return;
         }
         if (dischargeCutoffActive) {
-          elements.dischargeCutoffBtn.style.display = '';
-          elements.dischargeCutoffBtn.textContent = 'Re-enable Scheduler';
-          elements.dischargeCutoffBtn.className = 'cutoff-btn reactivate';
+          if (config.autoResumeScheduler) {
+            elements.dischargeCutoffBtn.style.display = 'none';
+          } else {
+            elements.dischargeCutoffBtn.style.display = '';
+            elements.dischargeCutoffBtn.textContent = 'Re-enable Scheduler';
+            elements.dischargeCutoffBtn.className = 'cutoff-btn reactivate';
+          }
           return;
         }
         if (isForceDischarging && soc !== null && soc <= config.dischargeCutoffThreshold) {
@@ -2181,6 +2213,8 @@
         elements.dischargeCutoffEnabled.checked = config.dischargeCutoffEnabled;
         elements.dischargeCutoffThreshold.value = config.dischargeCutoffThreshold;
         elements.dischargeCutoffAutoThreshold.value = config.dischargeCutoffAutoThreshold;
+        elements.autoResumeScheduler.checked = config.autoResumeScheduler;
+        elements.autoResumeTime.value = config.autoResumeTime;
         renderFreePeriods();
         elements.settingsOverlay.className = 'settings-overlay active';
       }
@@ -2222,6 +2256,8 @@
             if (imported.dischargeCutoffEnabled !== undefined) config.dischargeCutoffEnabled = imported.dischargeCutoffEnabled;
             if (imported.dischargeCutoffThreshold !== undefined) config.dischargeCutoffThreshold = imported.dischargeCutoffThreshold;
             if (imported.dischargeCutoffAutoThreshold !== undefined) config.dischargeCutoffAutoThreshold = imported.dischargeCutoffAutoThreshold;
+            if (imported.autoResumeScheduler !== undefined) config.autoResumeScheduler = imported.autoResumeScheduler;
+            if (imported.autoResumeTime !== undefined) config.autoResumeTime = imported.autoResumeTime;
             saveConfig();
             openSettings();
             var importBtn = document.getElementById('importSettings');
@@ -2287,6 +2323,8 @@
           config.dischargeCutoffThreshold = (isNaN(dct) || dct < 5 || dct > 95) ? 55 : dct;
           var dcat = parseInt(elements.dischargeCutoffAutoThreshold.value, 10);
           config.dischargeCutoffAutoThreshold = (isNaN(dcat) || dcat < 5 || dcat > 95) ? 50 : dcat;
+          config.autoResumeScheduler = elements.autoResumeScheduler.checked;
+          config.autoResumeTime = elements.autoResumeTime.value || '00:00';
           if (!config.dischargeCutoffEnabled && prevCutoffEnabled && dischargeCutoffActive) {
             sendDischargeCutoff('deactivate');
           }
