@@ -191,20 +191,11 @@ export default {
           });
         } else {
           try {
-            var cutoffText = await request.text();
-            if (!cutoffText) {
-              response = new Response(JSON.stringify({ error: 'empty body', method: request.method }), {
-                status: 400,
-                headers: { 'Content-Type': 'application/json' }
-              });
-            } else {
-              var cutoffBody = JSON.parse(cutoffText);
-              var enableScheduler = cutoffBody.action !== 'activate';
-              var cutoffResultRaw = await setSchedulerFlag(env, enableScheduler);
-              response = new Response(JSON.stringify(cutoffResultRaw), {
-                headers: { 'Content-Type': 'application/json' }
-              });
-            }
+            // Disable the scheduler to stop force discharge (falls back to Self Use)
+            var setResult = await setSchedulerFlag(env, false);
+            response = new Response(JSON.stringify(setResult), {
+              headers: { 'Content-Type': 'application/json' }
+            });
           } catch (cutoffErr) {
             response = new Response(JSON.stringify({ error: 'discharge-cutoff: ' + cutoffErr.message }), {
               status: 500,

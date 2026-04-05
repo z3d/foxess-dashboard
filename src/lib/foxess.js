@@ -300,9 +300,9 @@ export async function getSchedulerFlag(env) {
   return response.json();
 }
 
-// Enable or disable the scheduler on the inverter
+// Enable or disable the scheduler main switch
 export async function setSchedulerFlag(env, enable) {
-  var path = '/op/v0/device/scheduler/set';
+  var path = '/op/v0/device/scheduler/set/flag';
   var headers = createFoxESSHeaders(path, env.FOXESS_API_KEY);
 
   var body = {
