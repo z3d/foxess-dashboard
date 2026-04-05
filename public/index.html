@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.15.6">
+  <meta name="app-version" content="1.15.7">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -2066,7 +2066,8 @@
                 var resp = JSON.parse(xhr.responseText);
                 if (resp.errno === 0) {
                   dischargeCutoffActive = (action === 'activate');
-                  updateCutoffUI(null);
+                  var currentSoc = parseFloat(elements.socValue.textContent);
+                  updateCutoffUI(isNaN(currentSoc) ? null : currentSoc);
                 }
               } catch (e) {
                 // Ignore parse errors
