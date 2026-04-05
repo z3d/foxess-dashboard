@@ -2,7 +2,7 @@
 // Network-first strategy: try network, fall back to cached copy
 // Ensures the app loads even when offline (especially in standalone/home-screen mode)
 
-var CACHE_NAME = 'foxess-dashboard-v1';
+var CACHE_NAME = 'foxess-dashboard-v2';
 
 self.addEventListener('install', function(event) {
   // Precache the page immediately so it's available offline from the start
