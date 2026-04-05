@@ -1875,7 +1875,7 @@
 
         chargePower = chargePower || 0;
         dischargePower = dischargePower || 0;
-        isForceDischarging = dischargePower > 0.05;
+        // isForceDischarging set after feedinPower is read below
 
         elements.batteryStatus.className = 'battery-status';
         elements.batteryTime.className = 'battery-time hidden';
@@ -1975,6 +1975,9 @@
         var loadsPower = getVarValue(data, 'loadsPower');
         var feedinPower = getVarValue(data, 'feedinPower');
         var gridConsumption = getVarValue(data, 'gridConsumptionPower');
+
+        // Force discharge = battery discharging AND exporting to grid
+        isForceDischarging = dischargePower > 0.05 && (feedinPower || 0) > 0.05;
 
         elements.solarPower.textContent = formatNumber(pvPower, 2);
         elements.loadPower.textContent = formatNumber(loadsPower, 2);
