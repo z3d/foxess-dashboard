@@ -79,7 +79,8 @@ export default {
             headers: { 'Content-Type': 'application/json' }
           });
         } else {
-          var ttl = parseInt(env.CACHE_TTL) || 120;
+          var nocache = url.searchParams.get('nocache') === '1';
+          var ttl = nocache ? 0 : (parseInt(env.CACHE_TTL) || 120);
           var cached = await cachedFetch('realtime', function() {
             return fetchRealtimeData(env);
           }, ttl);
