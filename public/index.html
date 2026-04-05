@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.15.7">
+  <meta name="app-version" content="1.15.8">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1707,20 +1707,24 @@
       }
 
       function computeCorrectionFactor(cal) {
-        var sumForecast = 0;
-        var sumActual = 0;
-        var count = 0;
-        var keys = Object.keys(cal);
+        var weightedForecast = 0;
+        var weightedActual = 0;
+        var totalWeight = 0;
+        var today = getTodayStr();
+        var keys = Object.keys(cal).sort();
         for (var i = 0; i < keys.length; i++) {
           var entry = cal[keys[i]];
           if (entry.forecast > 0 && entry.actual > 0) {
-            sumForecast += entry.forecast;
-            sumActual += entry.actual;
-            count++;
+            // Exponential decay: recent days count more (half-life ~7 days)
+            var daysAgo = Math.round((new Date(today) - new Date(keys[i])) / 86400000);
+            var weight = Math.pow(0.9, daysAgo);
+            weightedForecast += entry.forecast * weight;
+            weightedActual += entry.actual * weight;
+            totalWeight += weight;
           }
         }
-        if (count < 2) return 0.607; // fallback
-        return sumActual / sumForecast;
+        if (totalWeight < 0.5) return 0.55; // fallback until calibrated
+        return weightedActual / weightedForecast;
       }
 
       function getTodayStr() {
@@ -1774,12 +1778,14 @@
               var data = JSON.parse(xhr.responseText);
               var cal = loadCalibration();
 
-              // Store today's raw forecast for calibration
+              // Store today's raw forecast for calibration (only first fetch of the day)
               var today = getTodayStr();
               if (data.today > 0) {
                 if (!cal[today]) cal[today] = {};
-                cal[today].forecast = data.today;
-                saveCalibration(cal);
+                if (!cal[today].forecast) {
+                  cal[today].forecast = data.today;
+                  saveCalibration(cal);
+                }
               }
 
               // Try to fetch yesterday's actual generation for calibration
