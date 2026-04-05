@@ -191,8 +191,10 @@ export default {
           });
         } else {
           try {
-            // Disable the scheduler to stop force discharge (falls back to Self Use)
-            var setResult = await setSchedulerFlag(env, false);
+            var cutoffText = await request.text();
+            var cutoffBody = cutoffText ? JSON.parse(cutoffText) : {};
+            var enableFlag = cutoffBody.action === 'reactivate';
+            var setResult = await setSchedulerFlag(env, enableFlag);
             response = new Response(JSON.stringify(setResult), {
               headers: { 'Content-Type': 'application/json' }
             });
