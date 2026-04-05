@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.15.1">
+  <meta name="app-version" content="1.15.2">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1165,8 +1165,12 @@
         </label>
       </div>
       <div class="settings-group">
-        <label for="dischargeCutoffThreshold">Discharge Cutoff SoC (%)</label>
-        <input type="number" id="dischargeCutoffThreshold" value="50" min="5" max="95" step="1">
+        <label for="dischargeCutoffThreshold">Show Button SoC (%)</label>
+        <input type="number" id="dischargeCutoffThreshold" value="55" min="5" max="95" step="1">
+      </div>
+      <div class="settings-group">
+        <label for="dischargeCutoffAutoThreshold">Auto Stop SoC (%)</label>
+        <input type="number" id="dischargeCutoffAutoThreshold" value="50" min="5" max="95" step="1">
       </div>
       <button class="settings-save" id="settingsSave">Save Settings</button>
       <div style="display:-webkit-box;display:-webkit-flex;display:flex;gap:10px;margin-top:10px;">
@@ -1201,7 +1205,8 @@
         chargeCutoffHours: 2.5,
         freePeriods: [{start: 11, end: 14}],
         dischargeCutoffEnabled: false,
-        dischargeCutoffThreshold: 50
+        dischargeCutoffThreshold: 55,
+        dischargeCutoffAutoThreshold: 50
       };
 
       var refreshTimer = null;
@@ -1265,6 +1270,7 @@
         elements.dischargeCutoffBtn = document.getElementById('dischargeCutoffBtn');
         elements.dischargeCutoffEnabled = document.getElementById('dischargeCutoffEnabled');
         elements.dischargeCutoffThreshold = document.getElementById('dischargeCutoffThreshold');
+        elements.dischargeCutoffAutoThreshold = document.getElementById('dischargeCutoffAutoThreshold');
       }
 
       function loadConfig() {
@@ -1285,7 +1291,8 @@
             config.use24hClock = parsed.use24hClock !== undefined ? parsed.use24hClock : false;
             config.freePeriods = parsed.freePeriods || [{start: 11, end: 14}];
             config.dischargeCutoffEnabled = parsed.dischargeCutoffEnabled !== undefined ? parsed.dischargeCutoffEnabled : false;
-            config.dischargeCutoffThreshold = parsed.dischargeCutoffThreshold !== undefined ? parsed.dischargeCutoffThreshold : 50;
+            config.dischargeCutoffThreshold = parsed.dischargeCutoffThreshold !== undefined ? parsed.dischargeCutoffThreshold : 55;
+            config.dischargeCutoffAutoThreshold = parsed.dischargeCutoffAutoThreshold !== undefined ? parsed.dischargeCutoffAutoThreshold : 50;
           }
         } catch (e) {
           // Ignore errors
@@ -1990,12 +1997,10 @@
           elements.gridImportCard.className = 'stat-card grid-import';
         }
 
-        // Discharge cutoff: auto-trigger + button visibility
-        if (config.dischargeCutoffEnabled && soc !== null && isForceDischarging) {
-          if (soc <= config.dischargeCutoffThreshold && !dischargeCutoffActive) {
+        // Discharge cutoff: auto-trigger at lower threshold
+        if (config.dischargeCutoffEnabled && config.dischargeCutoffAutoThreshold > 0 && soc !== null && isForceDischarging) {
+          if (soc <= config.dischargeCutoffAutoThreshold && !dischargeCutoffActive) {
             sendDischargeCutoff('activate');
-          } else if (soc > config.dischargeCutoffThreshold + 5 && dischargeCutoffActive) {
-            sendDischargeCutoff('deactivate');
           }
         }
         updateCutoffUI(soc);
@@ -2175,6 +2180,7 @@
         elements.use24hClock.checked = config.use24hClock;
         elements.dischargeCutoffEnabled.checked = config.dischargeCutoffEnabled;
         elements.dischargeCutoffThreshold.value = config.dischargeCutoffThreshold;
+        elements.dischargeCutoffAutoThreshold.value = config.dischargeCutoffAutoThreshold;
         renderFreePeriods();
         elements.settingsOverlay.className = 'settings-overlay active';
       }
@@ -2215,6 +2221,7 @@
             if (imported.freePeriods !== undefined) config.freePeriods = imported.freePeriods;
             if (imported.dischargeCutoffEnabled !== undefined) config.dischargeCutoffEnabled = imported.dischargeCutoffEnabled;
             if (imported.dischargeCutoffThreshold !== undefined) config.dischargeCutoffThreshold = imported.dischargeCutoffThreshold;
+            if (imported.dischargeCutoffAutoThreshold !== undefined) config.dischargeCutoffAutoThreshold = imported.dischargeCutoffAutoThreshold;
             saveConfig();
             openSettings();
             var importBtn = document.getElementById('importSettings');
@@ -2277,7 +2284,9 @@
           var prevCutoffEnabled = config.dischargeCutoffEnabled;
           config.dischargeCutoffEnabled = elements.dischargeCutoffEnabled.checked;
           var dct = parseInt(elements.dischargeCutoffThreshold.value, 10);
-          config.dischargeCutoffThreshold = (isNaN(dct) || dct < 5 || dct > 95) ? 50 : dct;
+          config.dischargeCutoffThreshold = (isNaN(dct) || dct < 5 || dct > 95) ? 55 : dct;
+          var dcat = parseInt(elements.dischargeCutoffAutoThreshold.value, 10);
+          config.dischargeCutoffAutoThreshold = (isNaN(dcat) || dcat < 5 || dcat > 95) ? 50 : dcat;
           if (!config.dischargeCutoffEnabled && prevCutoffEnabled && dischargeCutoffActive) {
             sendDischargeCutoff('deactivate');
           }
