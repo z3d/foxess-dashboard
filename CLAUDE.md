@@ -4,8 +4,9 @@ Single Cloudflare Worker serving a static dashboard (HTML/CSS/JS) and JSON API e
 
 ## Quick Commands
 
-- `npx wrangler dev` — local dev server at `http://localhost:8787`
-- `npx wrangler deploy` — deploy to Cloudflare (also triggered by git push to `master`)
+- `npm run setup` — interactive setup wizard
+- `npm run dev` — local dev server at `http://localhost:8787`
+- `npm run deploy` — deploy to Cloudflare (also triggered by git push to `master`)
 - Git push to `master` auto-deploys via Cloudflare Git integration
 
 ## Architecture
@@ -68,6 +69,7 @@ A service worker (`public/sw.js`) prevents blank-screen-of-death when the app is
 - **DOM elements**: All cached in the `elements` object, initialized in `initializeElements()` — add new elements there
 - **User config**: Stored in the `config` object, persisted to `localStorage` via `loadSettings()`/`saveSettings()`
 - **Edge caching**: `cachedFetch()` uses `caches.default` with a synthetic Request URL (`https://cache.internal/key`) — cache keys must be unique per data type
+- **Toolchain**: Wrangler 4 requires Node.js 22+ and matches the configured 2026 compatibility date for local dev
 
 ## Environment Variables (Cloudflare Dashboard)
 
@@ -87,7 +89,9 @@ All defined in `src/worker.js`:
 |-------|------|-------------|
 | `GET /api/health` | No | Returns `{"status":"ok","timestamp":...}` |
 | `GET/POST /api/realtime` | Yes (`X-API-Key` header) | Real-time inverter data from FoxESS |
-| `GET/POST /api/report?type=day` | Yes (`X-API-Key` header) | Energy report data from FoxESS |
+| `GET/POST /api/report?type=day\|month\|year` | Yes (`X-API-Key` header) | Energy report data from FoxESS |
+| `GET /api/daily-generation?date=YYYY-MM-DD` | Yes (`X-API-Key` header) | Solar generation total for a date |
+| `GET /api/solar-forecast` | Yes (`X-API-Key` header) | Forecast.solar production forecast |
 | `GET /api/battery/scheduler` | Yes (`X-API-Key` header) | Current scheduler config from FoxESS (cached) |
 | `POST /api/battery/discharge-cutoff` | Yes (`X-API-Key` header) | Enable/disable scheduler to stop force discharge |
 

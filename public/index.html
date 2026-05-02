@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.15.11">
+  <meta name="app-version" content="1.15.12">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1773,6 +1773,7 @@
         var baseUrl = config.workerUrl || window.location.origin;
         var xhr = new XMLHttpRequest();
         xhr.open('GET', baseUrl + '/api/solar-forecast', true);
+        if (config.apiKey) xhr.setRequestHeader('X-API-Key', config.apiKey);
         xhr.onreadystatechange = function() {
           if (xhr.readyState === 4 && xhr.status === 200) {
             try {

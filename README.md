@@ -9,15 +9,21 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - Time to full charge / time to reserve estimates with expected completion time
 - Configurable battery size and reserve percentage
 - Battery temperature and grid voltage
-- Solar generation power
+- Solar generation power with today's production total
+- Auto-calibrating solar forecast with correction factor
 - Home load consumption
 - Grid import/export with configurable free period highlighting (e.g., Globird ZeroHero)
+- Force discharge protection — automatically stops discharge at a configurable SoC threshold with cutoff indicator
+- Auto-resume scheduler at a configurable time after discharge cutoff
+- Re-enable Scheduler button to manually restore normal operation
 - Weather panel with current conditions emoji, temperature, humidity, dew point comfort indicator, and sunrise/sunset times
 - 12-hour (AM/PM) or 24-hour clock format
 - Dark theme optimized for always-on displays
-- "Add to Home Screen" support for iPad/iPhone
+- Responsive layout for modern iPhones and iPads
+- "Add to Home Screen" support with offline fallback via service worker
 - Automatic reload when new version is deployed
 - Configurable refresh interval with countdown timer
+- Manual refresh bypasses edge cache for immediate data
 - "Last updated" timestamp display on connection errors
 - Import/export settings for easy backup and migration
 - Edge caching to reduce FoxESS API quota usage
@@ -40,6 +46,7 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 
 ## Prerequisites
 
+- Node.js 22+ with npm (required by Wrangler 4)
 - FoxESS Cloud account with API access
 - Cloudflare account (free tier works)
 
@@ -76,7 +83,12 @@ Before running setup, have these ready:
 
 If you prefer to configure manually instead of using the wizard:
 
-1. Copy `.dev.vars.example` or create `.dev.vars`:
+1. Install dependencies:
+   ```bash
+   npm install
+   ```
+
+2. Create `.dev.vars` in the repo root:
    ```
    FOXESS_API_KEY=your-foxess-api-key
    FOXESS_DEVICE_SN=your-device-serial
@@ -85,9 +97,9 @@ If you prefer to configure manually instead of using the wizard:
    CACHE_TTL=60
    ```
 
-2. Deploy with `npx wrangler login && npx wrangler deploy`
+3. Deploy with `npx wrangler login && npm run deploy`
 
-3. Set secrets in **Cloudflare Dashboard > Workers & Pages > your worker > Settings > Variables and Secrets**:
+4. Set secrets in **Cloudflare Dashboard > Workers & Pages > your worker > Settings > Variables and Secrets**:
 
 | Variable | Required | Description |
 |----------|----------|-------------|
@@ -99,7 +111,7 @@ If you prefer to configure manually instead of using the wizard:
 
 Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
 
-### 4. Configure the Dashboard
+### Configure the Dashboard
 
 1. Open your worker URL in a browser (e.g., `https://<your-worker>.<your-subdomain>.workers.dev`)
 2. Click **Settings**
@@ -110,6 +122,7 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
 7. Configure battery settings:
    - **Battery Size**: Your battery capacity in kWh (default: 41)
    - **Battery Reserve**: Minimum charge percentage to maintain (default: 10%)
+   - **Discharge Cutoff**: Enable to automatically stop force discharge when SoC drops to a threshold, with optional auto-resume at a scheduled time
 8. Configure **Free Grid Import Periods** for plans like Globird ZeroHero:
    - Default: 11:00 - 14:00 (11 AM - 2 PM)
    - Add additional periods with "+ Add Period"
@@ -120,7 +133,7 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
 10. Click **Save Settings**
 11. Use **Export Settings** / **Import Settings** to back up or restore your configuration as a JSON file
 
-### 5. Add to iPad Home Screen
+### Add to iPad Home Screen
 
 1. Open Safari on your iPad
 2. Navigate to your dashboard URL
@@ -150,7 +163,9 @@ curl -H "X-API-Key: your-secret-key" https://your-worker.workers.dev/api/realtim
 |----------|--------|-------------|---------------|
 | `/api/health` | GET | Health check | No |
 | `/api/realtime` | GET/POST | Real-time inverter data | Yes |
-| `/api/report?type=day` | GET/POST | Daily energy report | Yes |
+| `/api/report?type=day\|month\|year` | GET/POST | Energy report data | Yes |
+| `/api/daily-generation?date=YYYY-MM-DD` | GET | Solar generation total for a date | Yes |
+| `/api/solar-forecast` | GET | Solar production forecast | Yes |
 | `/api/battery/scheduler` | GET | Current scheduler config | Yes |
 | `/api/battery/discharge-cutoff` | POST | Enable/disable scheduler (stop force discharge) | Yes |
 
@@ -160,6 +175,11 @@ curl -H "X-API-Key: your-secret-key" https://your-worker.workers.dev/api/realtim
 - Verify your Worker URL is correct in dashboard settings
 - Check that the worker is deployed and running (`/api/health` should return OK)
 - Ensure CORS is properly configured (`ALLOWED_ORIGIN`)
+
+### Local dev server will not start
+- Use Node.js 22+ (`node -v`)
+- Run `npm install` to install the pinned Wrangler 4 dependency
+- Run `npm run dev` from the project root
 
 ### "API Error" message
 - Verify your `FOXESS_API_KEY` is correct

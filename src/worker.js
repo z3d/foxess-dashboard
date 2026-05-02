@@ -80,7 +80,7 @@ export default {
           });
         } else {
           var nocache = url.searchParams.get('nocache') === '1';
-          var ttl = nocache ? 0 : (parseInt(env.CACHE_TTL) || 120);
+          var ttl = nocache ? 0 : (parseInt(env.CACHE_TTL) || 60);
           var cached = await cachedFetch('realtime', function() {
             return fetchRealtimeData(env);
           }, ttl);
@@ -98,7 +98,7 @@ export default {
           });
         } else {
           var reportType = url.searchParams.get('type') || 'day';
-          var ttl2 = parseInt(env.CACHE_TTL) || 120;
+          var ttl2 = parseInt(env.CACHE_TTL) || 60;
           var cached2 = await cachedFetch('report-' + reportType, function() {
             return fetchReportData(env, reportType);
           }, ttl2);
@@ -158,13 +158,20 @@ export default {
         }
 
       } else if (path === '/api/solar-forecast') {
-        var cached3 = await cachedFetch('solar-forecast', function() {
-          return fetchSolarForecast();
-        }, 3600);
-        var body3 = await cached3.text();
-        response = new Response(body3, {
-          headers: { 'Content-Type': 'application/json' }
-        });
+        if (!validateApiKey(request, env)) {
+          response = new Response(JSON.stringify({ error: 'Unauthorized' }), {
+            status: 401,
+            headers: { 'Content-Type': 'application/json' }
+          });
+        } else {
+          var cached3 = await cachedFetch('solar-forecast', function() {
+            return fetchSolarForecast();
+          }, 3600);
+          var body3 = await cached3.text();
+          response = new Response(body3, {
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
 
       } else if (path === '/api/battery/scheduler') {
         if (!validateApiKey(request, env)) {
@@ -173,7 +180,7 @@ export default {
             headers: { 'Content-Type': 'application/json' }
           });
         } else {
-          var schedTtl = parseInt(env.CACHE_TTL) || 120;
+          var schedTtl = parseInt(env.CACHE_TTL) || 60;
           var cachedSched = await cachedFetch('scheduler', function() {
             return getSchedulerFlag(env);
           }, schedTtl);
