@@ -66,6 +66,7 @@ A service worker (`public/sw.js`) prevents blank-screen-of-death when the app is
 
 - **FoxESS signature**: Uses literal `\r\n` characters (escaped, not actual CRLF) in the MD5 hash — see `generateSignature()` in `src/lib/foxess.js`
 - **Open-Meteo timestamps**: Always use `&timeformat=unixtime` and parse with `new Date(timestamp * 1000)` — ISO strings without timezone offset get parsed as UTC in some browsers
+- **Force discharge periods**: `forceDischargePeriods` defaults to `{start: 18, end: 20}`; automatic discharge cutoff and the manual stop button only appear inside configured windows, and outside-window detection shows a warning indicator
 - **DOM elements**: All cached in the `elements` object, initialized in `initializeElements()` — add new elements there
 - **User config**: Stored in the `config` object, persisted to `localStorage` via `loadSettings()`/`saveSettings()`
 - **Edge caching**: `cachedFetch()` uses `caches.default` with a synthetic Request URL (`https://cache.internal/key`) — cache keys must be unique per data type

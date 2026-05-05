@@ -13,7 +13,7 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - Auto-calibrating solar forecast with correction factor
 - Home load consumption
 - Grid import/export with configurable free period highlighting (e.g., Globird ZeroHero)
-- Force discharge protection — automatically stops discharge at a configurable SoC threshold with cutoff indicator
+- Force discharge protection — automatically stops discharge at a configurable SoC threshold, optionally limited to force-discharge time windows
 - Auto-resume scheduler at a configurable time after discharge cutoff
 - Re-enable Scheduler button to manually restore normal operation
 - Weather panel with current conditions emoji, temperature, humidity, dew point comfort indicator, and sunrise/sunset times
@@ -123,6 +123,7 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
    - **Battery Size**: Your battery capacity in kWh (default: 41)
    - **Battery Reserve**: Minimum charge percentage to maintain (default: 10%)
    - **Discharge Cutoff**: Enable to automatically stop force discharge when SoC drops to a threshold, with optional auto-resume at a scheduled time
+   - **Force Discharge Periods**: Time windows that limit when automatic force-discharge cutoff and the manual stop button can appear; default: 18:00 - 20:00 (6 PM - 8 PM). Outside-window detection only shows a warning indicator
 8. Configure **Free Grid Import Periods** for plans like Globird ZeroHero:
    - Default: 11:00 - 14:00 (11 AM - 2 PM)
    - Add additional periods with "+ Add Period"

@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.15.12">
+  <meta name="app-version" content="1.15.16">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -411,6 +411,10 @@
     .cutoff-indicator.stopped {
       background: #ef4444;
       color: #fff;
+    }
+    .cutoff-indicator.warning {
+      background: #fbbf24;
+      color: #000;
     }
 
 
@@ -1182,6 +1186,11 @@
         </label>
       </div>
       <div class="settings-group">
+        <label>Force Discharge Periods</label>
+        <div id="forceDischargePeriodsContainer"></div>
+        <button type="button" class="btn" id="addForceDischargePeriod" style="margin-top: 8px;">+ Add Period</button>
+      </div>
+      <div class="settings-group">
         <label for="dischargeCutoffThreshold">Show Button SoC (%)</label>
         <input type="number" id="dischargeCutoffThreshold" value="55" min="5" max="95" step="1">
       </div>
@@ -1231,6 +1240,7 @@
         use24hClock: false,
         chargeCutoffHours: 2.5,
         freePeriods: [{start: 11, end: 14}],
+        forceDischargePeriods: [{start: 18, end: 20}],
         dischargeCutoffEnabled: false,
         dischargeCutoffThreshold: 55,
         dischargeCutoffAutoThreshold: 50,
@@ -1245,6 +1255,8 @@
       var dischargeCutoffActive = false;
       var dischargeCutoffCooldown = 0;
       var isForceDischarging = false;
+      var forceDischargeConfirmations = 0;
+      var forceDischargeLastSeen = 0;
       var todaySunsetUnix = null;
       var elements = {};
 
@@ -1300,6 +1312,8 @@
         elements.dischargeCutoffBtn = document.getElementById('dischargeCutoffBtn');
         elements.cutoffIndicator = document.getElementById('cutoffIndicator');
         elements.dischargeCutoffEnabled = document.getElementById('dischargeCutoffEnabled');
+        elements.forceDischargePeriodsContainer = document.getElementById('forceDischargePeriodsContainer');
+        elements.addForceDischargePeriod = document.getElementById('addForceDischargePeriod');
         elements.dischargeCutoffThreshold = document.getElementById('dischargeCutoffThreshold');
         elements.dischargeCutoffAutoThreshold = document.getElementById('dischargeCutoffAutoThreshold');
         elements.autoResumeScheduler = document.getElementById('autoResumeScheduler');
@@ -1323,6 +1337,7 @@
             config.chargeCutoffHours = parsed.chargeCutoffHours !== undefined ? parsed.chargeCutoffHours : 2.5;
             config.use24hClock = parsed.use24hClock !== undefined ? parsed.use24hClock : false;
             config.freePeriods = parsed.freePeriods || [{start: 11, end: 14}];
+            config.forceDischargePeriods = parsed.forceDischargePeriods !== undefined ? parsed.forceDischargePeriods : [{start: 18, end: 20}];
             config.dischargeCutoffEnabled = parsed.dischargeCutoffEnabled !== undefined ? parsed.dischargeCutoffEnabled : false;
             config.dischargeCutoffThreshold = parsed.dischargeCutoffThreshold !== undefined ? parsed.dischargeCutoffThreshold : 55;
             config.dischargeCutoffAutoThreshold = parsed.dischargeCutoffAutoThreshold !== undefined ? parsed.dischargeCutoffAutoThreshold : 50;
@@ -1524,17 +1539,54 @@
         return Number(value).toFixed(d);
       }
 
-      function isInFreePeriod() {
+      function getCurrentHour() {
         var now = new Date();
-        var currentHour = now.getHours() + now.getMinutes() / 60;
-        var periods = config.freePeriods || [];
+        return now.getHours() + now.getMinutes() / 60;
+      }
+
+      function getActivePeriod(periods) {
+        var currentHour = getCurrentHour();
         for (var i = 0; i < periods.length; i++) {
           var p = periods[i];
           if (currentHour >= p.start && currentHour < p.end) {
-            return true;
+            return p;
           }
         }
-        return false;
+        return null;
+      }
+
+      function isInFreePeriod() {
+        return getActivePeriod(config.freePeriods || []) !== null;
+      }
+
+      function hasForceDischargePeriods() {
+        return !!(config.forceDischargePeriods && config.forceDischargePeriods.length > 0);
+      }
+
+      function getActiveForceDischargePeriod() {
+        return getActivePeriod(config.forceDischargePeriods || []);
+      }
+
+      function isForceDischargeCutoffAllowed() {
+        return !hasForceDischargePeriods() || getActiveForceDischargePeriod() !== null;
+      }
+
+      function formatPeriodHour(hour) {
+        hour = parseInt(hour, 10);
+        if (isNaN(hour)) return '--';
+        if (hour >= 24) return '24:00';
+        if (config.use24hClock) {
+          return (hour < 10 ? '0' : '') + hour + ':00';
+        }
+        var period = hour >= 12 ? 'PM' : 'AM';
+        var h12 = hour % 12;
+        if (h12 === 0) h12 = 12;
+        return h12 + period;
+      }
+
+      function formatPeriodLabel(period) {
+        if (!period) return '';
+        return formatPeriodHour(period.start) + '-' + formatPeriodHour(period.end);
       }
 
       function formatTime(date) {
@@ -1605,6 +1657,53 @@
           }
         }
         return null;
+      }
+
+      function normalizePower(value) {
+        var power = parseFloat(value);
+        if (isNaN(power) || !isFinite(power)) return null;
+        return power;
+      }
+
+      function detectForceDischarge(chargePower, dischargePower, pvPower, loadsPower, feedinPower) {
+        chargePower = normalizePower(chargePower);
+        dischargePower = normalizePower(dischargePower);
+        pvPower = normalizePower(pvPower);
+        loadsPower = normalizePower(loadsPower);
+        feedinPower = normalizePower(feedinPower);
+
+        if (chargePower === null) chargePower = 0;
+        if (dischargePower === null || feedinPower === null || pvPower === null || loadsPower === null) return false;
+        if (chargePower > 0.05 || dischargePower <= 0.4 || feedinPower <= 0.4) return false;
+
+        var pvSurplus = pvPower - loadsPower - chargePower;
+        if (pvSurplus < 0) pvSurplus = 0;
+
+        var batteryBackedExport = feedinPower - pvSurplus;
+        var requiredBatteryExport = dischargePower * 0.5;
+        if (requiredBatteryExport < 0.5) requiredBatteryExport = 0.5;
+        if (requiredBatteryExport > 1) requiredBatteryExport = 1;
+
+        return batteryBackedExport >= requiredBatteryExport;
+      }
+
+      function updateForceDischargeState(detected) {
+        var now = Date.now();
+        var refreshMs = Math.max(10, config.refreshInterval) * 1000;
+        var staleWindowMs = Math.max(120000, refreshMs * 2.5);
+
+        if (detected) {
+          if (!forceDischargeLastSeen || now - forceDischargeLastSeen > staleWindowMs) {
+            forceDischargeConfirmations = 0;
+          }
+          forceDischargeConfirmations++;
+          forceDischargeLastSeen = now;
+        } else {
+          forceDischargeConfirmations = 0;
+          forceDischargeLastSeen = 0;
+        }
+
+        isForceDischarging = forceDischargeConfirmations >= 2;
       }
 
       function setStatus(status, message) {
@@ -1894,6 +1993,7 @@
         lastSuccessfulUpdate = new Date();
 
         var staleness = updateStaleBanner(data);
+        var telemetryFresh = staleness === null;
         if (staleness === 'severe') {
           setStatus('error', 'Data stale');
         } else if (staleness === 'stale') {
@@ -2025,7 +2125,12 @@
         var loadsPower = getVarValue(data, 'loadsPower');
         var feedinPower = getVarValue(data, 'feedinPower');
         var gridConsumption = getVarValue(data, 'gridConsumptionPower');
-        isForceDischarging = dischargePower > 0.4 && feedinPower !== null && feedinPower > 0.4;
+        var forceDischargeCutoffAllowed = isForceDischargeCutoffAllowed();
+        if (telemetryFresh) {
+          updateForceDischargeState(detectForceDischarge(chargePower, dischargePower, pvPower, loadsPower, feedinPower));
+        } else {
+          updateForceDischargeState(false);
+        }
 
         elements.solarPower.textContent = formatNumber(pvPower, 2);
         elements.loadPower.textContent = formatNumber(loadsPower, 2);
@@ -2040,7 +2145,7 @@
         }
 
         // Discharge cutoff: auto-trigger at lower threshold (skip if recently re-enabled)
-        if (config.dischargeCutoffEnabled && config.dischargeCutoffAutoThreshold > 0 && soc !== null && isForceDischarging) {
+        if (telemetryFresh && forceDischargeCutoffAllowed && config.dischargeCutoffEnabled && config.dischargeCutoffAutoThreshold > 0 && soc !== null && isForceDischarging) {
           if (soc <= config.dischargeCutoffAutoThreshold && !dischargeCutoffActive && Date.now() > dischargeCutoffCooldown) {
             sendDischargeCutoff('activate');
           }
@@ -2091,6 +2196,9 @@
 
       function updateCutoffUI(soc) {
         if (!elements.dischargeCutoffBtn) return;
+        var activeForceDischargePeriod = getActiveForceDischargePeriod();
+        var forceDischargePeriodsConfigured = hasForceDischargePeriods();
+        var forceDischargeCutoffAllowed = !forceDischargePeriodsConfigured || activeForceDischargePeriod !== null;
         // Indicator next to SoC
         if (elements.cutoffIndicator) {
           if (dischargeCutoffActive) {
@@ -2099,8 +2207,13 @@
             elements.cutoffIndicator.className = 'cutoff-indicator stopped';
           } else if (config.dischargeCutoffEnabled && isForceDischarging) {
             elements.cutoffIndicator.style.display = '';
-            elements.cutoffIndicator.textContent = 'AUTO ' + config.dischargeCutoffAutoThreshold + '%';
-            elements.cutoffIndicator.className = 'cutoff-indicator armed';
+            if (forceDischargeCutoffAllowed) {
+              elements.cutoffIndicator.textContent = 'AUTO ' + config.dischargeCutoffAutoThreshold + '%' + (activeForceDischargePeriod ? ' | ' + formatPeriodLabel(activeForceDischargePeriod) : '');
+              elements.cutoffIndicator.className = 'cutoff-indicator armed';
+            } else {
+              elements.cutoffIndicator.textContent = 'FORCE OUTSIDE PERIOD';
+              elements.cutoffIndicator.className = 'cutoff-indicator warning';
+            }
           } else {
             elements.cutoffIndicator.style.display = 'none';
           }
@@ -2116,7 +2229,7 @@
           elements.dischargeCutoffBtn.className = 'cutoff-btn reactivate';
           return;
         }
-        if (isForceDischarging && soc !== null && soc <= config.dischargeCutoffThreshold) {
+        if (isForceDischarging && forceDischargeCutoffAllowed && soc !== null && soc <= config.dischargeCutoffThreshold) {
           elements.dischargeCutoffBtn.style.display = '';
           elements.dischargeCutoffBtn.textContent = 'Stop Discharge';
           elements.dischargeCutoffBtn.className = 'cutoff-btn';
@@ -2199,10 +2312,8 @@
         countdownTimer = setInterval(updateCountdown, 1000);
       }
 
-      function renderFreePeriods() {
-        var container = elements.freePeriodsContainer;
+      function renderPeriodRows(container, periods, removePeriod) {
         container.innerHTML = '';
-        var periods = config.freePeriods || [];
         for (var i = 0; i < periods.length; i++) {
           var p = periods[i];
           var row = document.createElement('div');
@@ -2219,24 +2330,45 @@
         for (var j = 0; j < removeButtons.length; j++) {
           (function(idx) {
             removeButtons[idx].onclick = function() {
-              config.freePeriods.splice(idx, 1);
-              renderFreePeriods();
+              removePeriod(idx);
             };
           })(j);
         }
       }
 
-      function collectFreePeriods() {
+      function collectPeriodRows(container) {
         var periods = [];
-        var rows = elements.freePeriodsContainer.querySelectorAll('.free-period-row');
+        var rows = container.querySelectorAll('.free-period-row');
         for (var i = 0; i < rows.length; i++) {
           var start = parseInt(rows[i].querySelector('.period-start').value, 10);
           var end = parseInt(rows[i].querySelector('.period-end').value, 10);
-          if (!isNaN(start) && !isNaN(end) && end > start) {
+          if (!isNaN(start) && !isNaN(end) && start >= 0 && start < 24 && end > start && end <= 24) {
             periods.push({start: start, end: end});
           }
         }
         return periods;
+      }
+
+      function renderFreePeriods() {
+        renderPeriodRows(elements.freePeriodsContainer, config.freePeriods || [], function(idx) {
+          config.freePeriods.splice(idx, 1);
+          renderFreePeriods();
+        });
+      }
+
+      function collectFreePeriods() {
+        return collectPeriodRows(elements.freePeriodsContainer);
+      }
+
+      function renderForceDischargePeriods() {
+        renderPeriodRows(elements.forceDischargePeriodsContainer, config.forceDischargePeriods || [], function(idx) {
+          config.forceDischargePeriods.splice(idx, 1);
+          renderForceDischargePeriods();
+        });
+      }
+
+      function collectForceDischargePeriods() {
+        return collectPeriodRows(elements.forceDischargePeriodsContainer);
       }
 
       function openSettings() {
@@ -2257,6 +2389,7 @@
         elements.autoResumeScheduler.checked = config.autoResumeScheduler;
         elements.autoResumeTime.value = config.autoResumeTime;
         renderFreePeriods();
+        renderForceDischargePeriods();
         elements.settingsOverlay.className = 'settings-overlay active';
       }
 
@@ -2294,6 +2427,7 @@
             if (imported.chargeCutoffHours !== undefined) config.chargeCutoffHours = imported.chargeCutoffHours;
             if (imported.use24hClock !== undefined) config.use24hClock = imported.use24hClock;
             if (imported.freePeriods !== undefined) config.freePeriods = imported.freePeriods;
+            if (imported.forceDischargePeriods !== undefined) config.forceDischargePeriods = imported.forceDischargePeriods;
             if (imported.dischargeCutoffEnabled !== undefined) config.dischargeCutoffEnabled = imported.dischargeCutoffEnabled;
             if (imported.dischargeCutoffThreshold !== undefined) config.dischargeCutoffThreshold = imported.dischargeCutoffThreshold;
             if (imported.dischargeCutoffAutoThreshold !== undefined) config.dischargeCutoffAutoThreshold = imported.dischargeCutoffAutoThreshold;
@@ -2339,6 +2473,11 @@
           renderFreePeriods();
         };
 
+        elements.addForceDischargePeriod.onclick = function() {
+          config.forceDischargePeriods.push({start: 18, end: 20});
+          renderForceDischargePeriods();
+        };
+
         settingsSave.onclick = function() {
           var url = elements.workerUrl.value;
           if (url && url.charAt(url.length - 1) === '/') {
@@ -2356,6 +2495,7 @@
           config.batteryReserve = isNaN(bRes) ? 10 : bRes;
           config.chargeCutoffHours = parseFloat(elements.chargeCutoffHours.value) || 2.5;
           config.freePeriods = collectFreePeriods();
+          config.forceDischargePeriods = collectForceDischargePeriods();
           config.showWeather = elements.showWeather.checked;
           config.use24hClock = elements.use24hClock.checked;
           var prevCutoffEnabled = config.dischargeCutoffEnabled;
