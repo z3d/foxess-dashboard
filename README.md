@@ -15,7 +15,7 @@ A simple, iOS 12-compatible dashboard for monitoring your FoxESS hybrid inverter
 - Grid import/export with configurable free period highlighting (e.g., Globird ZeroHero)
 - Force discharge protection — automatically stops discharge at a configurable SoC threshold, optionally limited to force-discharge time windows
 - Auto-resume scheduler at a configurable time after discharge cutoff
-- Re-enable Scheduler button to manually restore normal operation
+- Re-enable Scheduler button to manually restore normal operation without re-stopping in the same discharge window
 - Weather panel with current conditions emoji, temperature, humidity, dew point comfort indicator, and sunrise/sunset times
 - 12-hour (AM/PM) or 24-hour clock format
 - Dark theme optimized for always-on displays
@@ -122,7 +122,7 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
 7. Configure battery settings:
    - **Battery Size**: Your battery capacity in kWh (default: 41)
    - **Battery Reserve**: Minimum charge percentage to maintain (default: 10%)
-   - **Discharge Cutoff**: Enable to automatically stop force discharge when SoC drops to a threshold, with optional auto-resume at a scheduled time
+   - **Discharge Cutoff**: Enable to automatically stop force discharge when SoC drops to a threshold, with optional auto-resume at a scheduled time. Manual or automatic resume is remembered for the current discharge window so it does not immediately stop again.
    - **Force Discharge Periods**: Time windows that limit when automatic force-discharge cutoff and the manual stop button can appear; default: 18:00 - 20:00 (6 PM - 8 PM). Outside-window detection only shows a warning indicator
 8. Configure **Free Grid Import Periods** for plans like Globird ZeroHero:
    - Default: 11:00 - 14:00 (11 AM - 2 PM)
@@ -168,7 +168,7 @@ curl -H "X-API-Key: your-secret-key" https://your-worker.workers.dev/api/realtim
 | `/api/daily-generation?date=YYYY-MM-DD` | GET | Solar generation total for a date | Yes |
 | `/api/solar-forecast` | GET | Solar production forecast | Yes |
 | `/api/battery/scheduler` | GET | Current scheduler config | Yes |
-| `/api/battery/discharge-cutoff` | POST | Enable/disable scheduler (stop force discharge) | Yes |
+| `/api/battery/discharge-cutoff` | POST | Enable/disable scheduler for discharge cutoff actions | Yes |
 
 ## Troubleshooting
 

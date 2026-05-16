@@ -66,7 +66,7 @@ A service worker (`public/sw.js`) prevents blank-screen-of-death when the app is
 
 - **FoxESS signature**: Uses literal `\r\n` characters (escaped, not actual CRLF) in the MD5 hash — see `generateSignature()` in `src/lib/foxess.js`
 - **Open-Meteo timestamps**: Always use `&timeformat=unixtime` and parse with `new Date(timestamp * 1000)` — ISO strings without timezone offset get parsed as UTC in some browsers
-- **Force discharge periods**: `forceDischargePeriods` defaults to `{start: 18, end: 20}`; automatic discharge cutoff and the manual stop button only appear inside configured windows, and outside-window detection shows a warning indicator
+- **Force discharge periods**: `forceDischargePeriods` defaults to `{start: 18, end: 20}`; automatic discharge cutoff and the manual stop button only appear inside configured windows, outside-window detection shows a warning indicator, and manual/auto resume suppresses another cutoff for the current window until SoC rises above the auto threshold
 - **DOM elements**: All cached in the `elements` object, initialized in `initializeElements()` — add new elements there
 - **User config**: Stored in the `config` object, persisted to `localStorage` via `loadSettings()`/`saveSettings()`
 - **Edge caching**: `cachedFetch()` uses `caches.default` with a synthetic Request URL (`https://cache.internal/key`) — cache keys must be unique per data type
@@ -94,7 +94,7 @@ All defined in `src/worker.js`:
 | `GET /api/daily-generation?date=YYYY-MM-DD` | Yes (`X-API-Key` header) | Solar generation total for a date |
 | `GET /api/solar-forecast` | Yes (`X-API-Key` header) | Forecast.solar production forecast |
 | `GET /api/battery/scheduler` | Yes (`X-API-Key` header) | Current scheduler config from FoxESS (cached) |
-| `POST /api/battery/discharge-cutoff` | Yes (`X-API-Key` header) | Enable/disable scheduler to stop force discharge |
+| `POST /api/battery/discharge-cutoff` | Yes (`X-API-Key` header) | Enable/disable scheduler for discharge cutoff actions |
 
 ## Deployment
 

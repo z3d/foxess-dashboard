@@ -200,11 +200,19 @@ export default {
           try {
             var cutoffText = await request.text();
             var cutoffBody = cutoffText ? JSON.parse(cutoffText) : {};
-            var enableFlag = cutoffBody.action === 'reactivate';
-            var setResult = await setSchedulerFlag(env, enableFlag);
-            response = new Response(JSON.stringify(setResult), {
-              headers: { 'Content-Type': 'application/json' }
-            });
+            var cutoffAction = cutoffBody.action || '';
+            if (cutoffAction !== 'activate' && cutoffAction !== 'reactivate' && cutoffAction !== 'deactivate') {
+              response = new Response(JSON.stringify({ error: 'Invalid discharge-cutoff action' }), {
+                status: 400,
+                headers: { 'Content-Type': 'application/json' }
+              });
+            } else {
+              var enableFlag = cutoffAction !== 'activate';
+              var setResult = await setSchedulerFlag(env, enableFlag);
+              response = new Response(JSON.stringify(setResult), {
+                headers: { 'Content-Type': 'application/json' }
+              });
+            }
           } catch (cutoffErr) {
             response = new Response(JSON.stringify({ error: 'discharge-cutoff: ' + cutoffErr.message }), {
               status: 500,

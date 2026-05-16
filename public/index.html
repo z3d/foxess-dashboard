@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.15.17">
+  <meta name="app-version" content="1.15.18">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1254,6 +1254,7 @@
       var lastSuccessfulUpdate = null;
       var dischargeCutoffActive = false;
       var dischargeCutoffCooldown = 0;
+      var dischargeCutoffResumeKey = '';
       var isForceDischarging = false;
       var forceDischargeConfirmations = 0;
       var forceDischargeLastSeen = 0;
@@ -1569,6 +1570,57 @@
 
       function isForceDischargeCutoffAllowed() {
         return !hasForceDischargePeriods() || getActiveForceDischargePeriod() !== null;
+      }
+
+      function getLocalDateKey(date) {
+        var month = date.getMonth() + 1;
+        var day = date.getDate();
+        return date.getFullYear() + '-' + (month < 10 ? '0' : '') + month + '-' + (day < 10 ? '0' : '') + day;
+      }
+
+      function getDischargeCutoffResumeKey() {
+        var dateKey = getLocalDateKey(new Date());
+        var activePeriod = getActiveForceDischargePeriod();
+        if (activePeriod) {
+          return dateKey + ':' + activePeriod.start + '-' + activePeriod.end;
+        }
+        if (!hasForceDischargePeriods()) {
+          return dateKey + ':all';
+        }
+        return '';
+      }
+
+      function setDischargeCutoffResumeKey(key) {
+        dischargeCutoffResumeKey = key || '';
+        try {
+          if (dischargeCutoffResumeKey) {
+            localStorage.setItem('foxess_discharge_cutoff_resume_key', dischargeCutoffResumeKey);
+          } else {
+            localStorage.removeItem('foxess_discharge_cutoff_resume_key');
+          }
+        } catch (e) {
+          // Ignore storage errors
+        }
+      }
+
+      function loadDischargeCutoffResumeKey() {
+        try {
+          dischargeCutoffResumeKey = localStorage.getItem('foxess_discharge_cutoff_resume_key') || '';
+        } catch (e) {
+          dischargeCutoffResumeKey = '';
+        }
+      }
+
+      function isDischargeCutoffResumeSuppressed() {
+        var currentKey = getDischargeCutoffResumeKey();
+        return !!(currentKey && dischargeCutoffResumeKey === currentKey);
+      }
+
+      function updateDischargeCutoffResumeSuppression(soc) {
+        if (!dischargeCutoffResumeKey) return;
+        if (!getDischargeCutoffResumeKey() || (soc !== null && soc > config.dischargeCutoffAutoThreshold)) {
+          setDischargeCutoffResumeKey('');
+        }
       }
 
       function formatPeriodHour(hour) {
@@ -2131,6 +2183,7 @@
         } else {
           updateForceDischargeState(false);
         }
+        updateDischargeCutoffResumeSuppression(soc);
 
         elements.solarPower.textContent = formatNumber(pvPower, 2);
         elements.loadPower.textContent = formatNumber(loadsPower, 2);
@@ -2144,8 +2197,8 @@
           elements.gridImportCard.className = 'stat-card grid-import';
         }
 
-        // Discharge cutoff: auto-trigger at lower threshold (skip if recently re-enabled)
-        if (telemetryFresh && forceDischargeCutoffAllowed && config.dischargeCutoffEnabled && config.dischargeCutoffAutoThreshold > 0 && soc !== null && isForceDischarging) {
+        // Discharge cutoff: auto-trigger at lower threshold (skip after re-enable in current period)
+        if (telemetryFresh && forceDischargeCutoffAllowed && config.dischargeCutoffEnabled && config.dischargeCutoffAutoThreshold > 0 && soc !== null && isForceDischarging && !isDischargeCutoffResumeSuppressed()) {
           if (soc <= config.dischargeCutoffAutoThreshold && !dischargeCutoffActive && Date.now() > dischargeCutoffCooldown) {
             sendDischargeCutoff('activate');
           }
@@ -2181,6 +2234,9 @@
                   dischargeCutoffActive = (action === 'activate');
                   if (action === 'reactivate') {
                     dischargeCutoffCooldown = Date.now() + 300000;
+                    setDischargeCutoffResumeKey(getDischargeCutoffResumeKey());
+                  } else {
+                    setDischargeCutoffResumeKey('');
                   }
                   var currentSoc = parseFloat(elements.socValue.textContent);
                   updateCutoffUI(isNaN(currentSoc) ? null : currentSoc);
@@ -2568,6 +2624,7 @@
       function init() {
         initElements();
         loadConfig();
+        loadDischargeCutoffResumeKey();
         checkForUpdates();
         scheduleNightlyReload();
         updateWeatherVisibility();
