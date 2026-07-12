@@ -10,7 +10,7 @@
   <meta name="theme-color" content="#1a1a2e">
   <link rel="manifest" href="/manifest.webmanifest">
   <!-- AI: Bump version (semver) when making changes to this file -->
-  <meta name="app-version" content="1.15.18">
+  <meta name="app-version" content="1.17.0">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect fill='%231a1a2e' width='100' height='100' rx='20'/><text x='50' y='65' font-size='50' text-anchor='middle' fill='%234ade80'>⚡</text></svg>">
   <title>FoxESS Battery Monitor</title>
   <style>
@@ -1199,6 +1199,14 @@
         <input type="number" id="dischargeCutoffAutoThreshold" value="50" min="5" max="95" step="1">
       </div>
       <div class="settings-group">
+        <label for="dischargeCutoffFirstHourThreshold">First-Hour Stop SoC (%, 0 = off)</label>
+        <input type="number" id="dischargeCutoffFirstHourThreshold" value="0" min="0" max="95" step="1">
+      </div>
+      <div class="settings-group">
+        <label for="dischargeCutoffFinalStageHours">Final Stage Duration (hours)</label>
+        <input type="number" id="dischargeCutoffFinalStageHours" value="1" min="0.5" max="6" step="0.5">
+      </div>
+      <div class="settings-group">
         <label>
           <input type="checkbox" id="autoResumeScheduler" checked>
           Auto Resume Scheduler
@@ -1244,6 +1252,8 @@
         dischargeCutoffEnabled: false,
         dischargeCutoffThreshold: 55,
         dischargeCutoffAutoThreshold: 50,
+        dischargeCutoffFirstHourThreshold: 0,
+        dischargeCutoffFinalStageHours: 1,
         autoResumeScheduler: true,
         autoResumeTime: '00:00'
       };
@@ -1255,6 +1265,7 @@
       var dischargeCutoffActive = false;
       var dischargeCutoffCooldown = 0;
       var dischargeCutoffResumeKey = '';
+      var dischargeCutoffPhaseKey = '';
       var isForceDischarging = false;
       var forceDischargeConfirmations = 0;
       var forceDischargeLastSeen = 0;
@@ -1317,6 +1328,8 @@
         elements.addForceDischargePeriod = document.getElementById('addForceDischargePeriod');
         elements.dischargeCutoffThreshold = document.getElementById('dischargeCutoffThreshold');
         elements.dischargeCutoffAutoThreshold = document.getElementById('dischargeCutoffAutoThreshold');
+        elements.dischargeCutoffFirstHourThreshold = document.getElementById('dischargeCutoffFirstHourThreshold');
+        elements.dischargeCutoffFinalStageHours = document.getElementById('dischargeCutoffFinalStageHours');
         elements.autoResumeScheduler = document.getElementById('autoResumeScheduler');
         elements.autoResumeTime = document.getElementById('autoResumeTime');
       }
@@ -1342,6 +1355,8 @@
             config.dischargeCutoffEnabled = parsed.dischargeCutoffEnabled !== undefined ? parsed.dischargeCutoffEnabled : false;
             config.dischargeCutoffThreshold = parsed.dischargeCutoffThreshold !== undefined ? parsed.dischargeCutoffThreshold : 55;
             config.dischargeCutoffAutoThreshold = parsed.dischargeCutoffAutoThreshold !== undefined ? parsed.dischargeCutoffAutoThreshold : 50;
+            config.dischargeCutoffFirstHourThreshold = parsed.dischargeCutoffFirstHourThreshold !== undefined ? parsed.dischargeCutoffFirstHourThreshold : 0;
+            config.dischargeCutoffFinalStageHours = parsed.dischargeCutoffFinalStageHours !== undefined ? parsed.dischargeCutoffFinalStageHours : 1;
             config.autoResumeScheduler = parsed.autoResumeScheduler !== undefined ? parsed.autoResumeScheduler : true;
             config.autoResumeTime = parsed.autoResumeTime !== undefined ? parsed.autoResumeTime : '00:00';
           }
@@ -1620,6 +1635,63 @@
         if (!dischargeCutoffResumeKey) return;
         if (!getDischargeCutoffResumeKey() || (soc !== null && soc > config.dischargeCutoffAutoThreshold)) {
           setDischargeCutoffResumeKey('');
+        }
+      }
+
+      // Two-stage cutoff: an optional higher SoC threshold applies until the final
+      // stage of the window (duration configurable, default 1h); discharge
+      // auto-resumes at the final stage down to the normal auto threshold.
+      function getFinalStageStart(period) {
+        var hours = parseFloat(config.dischargeCutoffFinalStageHours);
+        if (isNaN(hours) || hours <= 0) hours = 1;
+        return period.end - hours;
+      }
+
+      function isFirstStageActive() {
+        var period = getActiveForceDischargePeriod();
+        return !!(config.dischargeCutoffFirstHourThreshold > 0 && period && getCurrentHour() < getFinalStageStart(period));
+      }
+
+      function getActiveCutoffThreshold() {
+        return isFirstStageActive() ? config.dischargeCutoffFirstHourThreshold : config.dischargeCutoffAutoThreshold;
+      }
+
+      function getDischargeCutoffPhaseKey() {
+        var resumeKey = getDischargeCutoffResumeKey();
+        return resumeKey ? resumeKey + ':first' : '';
+      }
+
+      function setDischargeCutoffPhaseKey(key) {
+        dischargeCutoffPhaseKey = key || '';
+        try {
+          if (dischargeCutoffPhaseKey) {
+            localStorage.setItem('foxess_discharge_cutoff_phase', dischargeCutoffPhaseKey);
+          } else {
+            localStorage.removeItem('foxess_discharge_cutoff_phase');
+          }
+        } catch (e) {
+          // Ignore storage errors
+        }
+      }
+
+      function loadDischargeCutoffPhaseKey() {
+        try {
+          dischargeCutoffPhaseKey = localStorage.getItem('foxess_discharge_cutoff_phase') || '';
+        } catch (e) {
+          dischargeCutoffPhaseKey = '';
+        }
+      }
+
+      function isFirstHourCutoffPending() {
+        var currentKey = getDischargeCutoffPhaseKey();
+        return !!(currentKey && dischargeCutoffPhaseKey === currentKey);
+      }
+
+      function updateDischargeCutoffPhaseState() {
+        if (!dischargeCutoffPhaseKey) return;
+        var currentKey = getDischargeCutoffPhaseKey();
+        if (!currentKey || dischargeCutoffPhaseKey !== currentKey) {
+          setDischargeCutoffPhaseKey('');
         }
       }
 
@@ -2184,6 +2256,7 @@
           updateForceDischargeState(false);
         }
         updateDischargeCutoffResumeSuppression(soc);
+        updateDischargeCutoffPhaseState();
 
         elements.solarPower.textContent = formatNumber(pvPower, 2);
         elements.loadPower.textContent = formatNumber(loadsPower, 2);
@@ -2197,11 +2270,16 @@
           elements.gridImportCard.className = 'stat-card grid-import';
         }
 
-        // Discharge cutoff: auto-trigger at lower threshold (skip after re-enable in current period)
-        if (telemetryFresh && forceDischargeCutoffAllowed && config.dischargeCutoffEnabled && config.dischargeCutoffAutoThreshold > 0 && soc !== null && isForceDischarging && !isDischargeCutoffResumeSuppressed()) {
-          if (soc <= config.dischargeCutoffAutoThreshold && !dischargeCutoffActive && Date.now() > dischargeCutoffCooldown) {
-            sendDischargeCutoff('activate');
+        // Discharge cutoff: auto-trigger at the stage-aware threshold (skip after re-enable in current period)
+        var activeCutoffThreshold = getActiveCutoffThreshold();
+        if (telemetryFresh && forceDischargeCutoffAllowed && config.dischargeCutoffEnabled && activeCutoffThreshold > 0 && soc !== null && isForceDischarging && !isDischargeCutoffResumeSuppressed()) {
+          if (soc <= activeCutoffThreshold && !dischargeCutoffActive && Date.now() > dischargeCutoffCooldown) {
+            sendDischargeCutoff('activate', { firstStage: isFirstStageActive() });
           }
+        }
+        // First-stage stop reached the final stage: resume so the normal threshold takes over
+        if (telemetryFresh && dischargeCutoffActive && isFirstHourCutoffPending() && !isFirstStageActive() && config.dischargeCutoffEnabled && soc !== null && soc > config.dischargeCutoffAutoThreshold && Date.now() > dischargeCutoffCooldown) {
+          sendDischargeCutoff('reactivate', { finalStage: true });
         }
         // Auto-resume scheduler at configured time
         if (dischargeCutoffActive && config.autoResumeScheduler) {
@@ -2218,7 +2296,7 @@
         updateCutoffUI(soc);
       }
 
-      function sendDischargeCutoff(action) {
+      function sendDischargeCutoff(action, opts) {
         var xhr = new XMLHttpRequest();
         xhr.open('POST', config.workerUrl + '/api/battery/discharge-cutoff', true);
         xhr.setRequestHeader('Content-Type', 'application/json');
@@ -2234,9 +2312,16 @@
                   dischargeCutoffActive = (action === 'activate');
                   if (action === 'reactivate') {
                     dischargeCutoffCooldown = Date.now() + 300000;
-                    setDischargeCutoffResumeKey(getDischargeCutoffResumeKey());
+                    if (opts && opts.finalStage) {
+                      // Final-hour resume: leave suppression off so the normal threshold can still stop discharge
+                      setDischargeCutoffResumeKey('');
+                    } else {
+                      setDischargeCutoffResumeKey(getDischargeCutoffResumeKey());
+                    }
+                    setDischargeCutoffPhaseKey('');
                   } else {
                     setDischargeCutoffResumeKey('');
+                    setDischargeCutoffPhaseKey(action === 'activate' && opts && opts.firstStage ? getDischargeCutoffPhaseKey() : '');
                   }
                   var currentSoc = parseFloat(elements.socValue.textContent);
                   updateCutoffUI(isNaN(currentSoc) ? null : currentSoc);
@@ -2259,12 +2344,12 @@
         if (elements.cutoffIndicator) {
           if (dischargeCutoffActive) {
             elements.cutoffIndicator.style.display = '';
-            elements.cutoffIndicator.textContent = 'STOPPED FORCED DISCHARGE';
+            elements.cutoffIndicator.textContent = isFirstHourCutoffPending() ? 'STOPPED UNTIL FINAL STAGE' : 'STOPPED FORCED DISCHARGE';
             elements.cutoffIndicator.className = 'cutoff-indicator stopped';
           } else if (config.dischargeCutoffEnabled && isForceDischarging) {
             elements.cutoffIndicator.style.display = '';
             if (forceDischargeCutoffAllowed) {
-              elements.cutoffIndicator.textContent = 'AUTO ' + config.dischargeCutoffAutoThreshold + '%' + (activeForceDischargePeriod ? ' | ' + formatPeriodLabel(activeForceDischargePeriod) : '');
+              elements.cutoffIndicator.textContent = 'AUTO ' + getActiveCutoffThreshold() + '%' + (activeForceDischargePeriod ? ' | ' + formatPeriodLabel(activeForceDischargePeriod) : '');
               elements.cutoffIndicator.className = 'cutoff-indicator armed';
             } else {
               elements.cutoffIndicator.textContent = 'FORCE OUTSIDE PERIOD';
@@ -2442,6 +2527,8 @@
         elements.dischargeCutoffEnabled.checked = config.dischargeCutoffEnabled;
         elements.dischargeCutoffThreshold.value = config.dischargeCutoffThreshold;
         elements.dischargeCutoffAutoThreshold.value = config.dischargeCutoffAutoThreshold;
+        elements.dischargeCutoffFirstHourThreshold.value = config.dischargeCutoffFirstHourThreshold;
+        elements.dischargeCutoffFinalStageHours.value = config.dischargeCutoffFinalStageHours;
         elements.autoResumeScheduler.checked = config.autoResumeScheduler;
         elements.autoResumeTime.value = config.autoResumeTime;
         renderFreePeriods();
@@ -2487,6 +2574,8 @@
             if (imported.dischargeCutoffEnabled !== undefined) config.dischargeCutoffEnabled = imported.dischargeCutoffEnabled;
             if (imported.dischargeCutoffThreshold !== undefined) config.dischargeCutoffThreshold = imported.dischargeCutoffThreshold;
             if (imported.dischargeCutoffAutoThreshold !== undefined) config.dischargeCutoffAutoThreshold = imported.dischargeCutoffAutoThreshold;
+            if (imported.dischargeCutoffFirstHourThreshold !== undefined) config.dischargeCutoffFirstHourThreshold = imported.dischargeCutoffFirstHourThreshold;
+            if (imported.dischargeCutoffFinalStageHours !== undefined) config.dischargeCutoffFinalStageHours = imported.dischargeCutoffFinalStageHours;
             if (imported.autoResumeScheduler !== undefined) config.autoResumeScheduler = imported.autoResumeScheduler;
             if (imported.autoResumeTime !== undefined) config.autoResumeTime = imported.autoResumeTime;
             saveConfig();
@@ -2560,6 +2649,10 @@
           config.dischargeCutoffThreshold = (isNaN(dct) || dct < 5 || dct > 95) ? 55 : dct;
           var dcat = parseInt(elements.dischargeCutoffAutoThreshold.value, 10);
           config.dischargeCutoffAutoThreshold = (isNaN(dcat) || dcat < 5 || dcat > 95) ? 50 : dcat;
+          var dcfh = parseInt(elements.dischargeCutoffFirstHourThreshold.value, 10);
+          config.dischargeCutoffFirstHourThreshold = (isNaN(dcfh) || dcfh < 0 || dcfh > 95) ? 0 : dcfh;
+          var dcfs = parseFloat(elements.dischargeCutoffFinalStageHours.value);
+          config.dischargeCutoffFinalStageHours = (isNaN(dcfs) || dcfs < 0.5 || dcfs > 6) ? 1 : dcfs;
           config.autoResumeScheduler = elements.autoResumeScheduler.checked;
           config.autoResumeTime = elements.autoResumeTime.value || '00:00';
           if (!config.dischargeCutoffEnabled && prevCutoffEnabled && dischargeCutoffActive) {
@@ -2625,6 +2718,7 @@
         initElements();
         loadConfig();
         loadDischargeCutoffResumeKey();
+        loadDischargeCutoffPhaseKey();
         checkForUpdates();
         scheduleNightlyReload();
         updateWeatherVisibility();

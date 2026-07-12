@@ -123,6 +123,8 @@ Click **Encrypt** for `FOXESS_API_KEY` and `API_KEY` to protect them.
    - **Battery Size**: Your battery capacity in kWh (default: 41)
    - **Battery Reserve**: Minimum charge percentage to maintain (default: 10%)
    - **Discharge Cutoff**: Enable to automatically stop force discharge when SoC drops to a threshold, with optional auto-resume at a scheduled time. Manual or automatic resume is remembered for the current discharge window so it does not immediately stop again.
+   - **First-Hour Stop SoC**: Optional higher threshold (0 = off) that applies until the final stage of a discharge window. If it stops discharge early, discharge automatically resumes when the final stage starts and the normal Auto Stop SoC takes over — useful for saving battery for the end of the window.
+   - **Final Stage Duration**: How many hours before the end of the window the normal Auto Stop SoC takes over (default: 1, range 0.5–6 in half-hour steps).
    - **Force Discharge Periods**: Time windows that limit when automatic force-discharge cutoff and the manual stop button can appear; default: 18:00 - 20:00 (6 PM - 8 PM). Outside-window detection only shows a warning indicator
 8. Configure **Free Grid Import Periods** for plans like Globird ZeroHero:
    - Default: 11:00 - 14:00 (11 AM - 2 PM)
