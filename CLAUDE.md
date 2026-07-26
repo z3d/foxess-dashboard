@@ -1,115 +1,45 @@
 # FoxESS Battery Monitor Dashboard
 
-Single Cloudflare Worker serving a static dashboard (HTML/CSS/JS) and JSON API endpoints that proxy the FoxESS Cloud API. Monitors a hybrid inverter and battery system in real time.
+Single Cloudflare Worker serving a static dashboard (`public/index.html`) and `/api/*` routes (`src/worker.js`) that proxy the FoxESS Cloud API. Monitors a hybrid inverter and battery in real time. Shared helpers (FoxESS signature, auth, CORS, caching) live in `src/lib/foxess.js`; routes are readable in `src/worker.js`.
 
-## Quick Commands
+## Commands
 
-- `npm run setup` — interactive setup wizard
-- `npm run dev` — local dev server at `http://localhost:8787`
-- `npm run deploy` — deploy to Cloudflare (also triggered by git push to `master`)
-- Git push to `master` auto-deploys via Cloudflare Git integration
-
-## Architecture
-
-```
-├── wrangler.jsonc          # Worker config (name, entry, assets)
-├── public/
-│   ├── index.html          # Single-file dashboard (HTML + CSS + JS)
-│   ├── sw.js               # Service worker for offline support (standalone/home-screen mode)
-│   ├── manifest.webmanifest # Web app manifest (standalone display)
-│   └── robots.txt
-└── src/
-    ├── worker.js           # Worker entry: routes /api/* requests
-    └── lib/
-        └── foxess.js       # Shared helpers (FoxESS API, auth, CORS, caching)
+```bash
+npm run setup      # interactive setup wizard
+npm run dev        # local dev at http://localhost:8787
+npm run deploy     # deploy (git push to master also auto-deploys)
 ```
 
-- **Static assets** (`public/`) served via Cloudflare Workers Static Assets (`assets.directory` in wrangler.jsonc)
-- **API routes** handled in `src/worker.js` — non-`/api/` requests fall through to `env.ASSETS.fetch(request)`
-- **Shared helpers** in `src/lib/foxess.js` — FoxESS signature generation (MD5), CORS, auth validation, edge caching via `caches.default`
+## Critical rules
 
-## Critical Constraints
+- **`public/index.html` must run on iOS 12 Safari**: no arrow functions, `let`/`const`, template literals, `for...of`, destructuring/spread/`?.`/`??`, `Promise.allSettled`, `Object.entries`, `Array.flat`. Use `var`, `function() {}`, string concatenation, indexed loops, `XMLHttpRequest`, `-webkit-` prefixes. Worker code (`src/`) is modern V8 but stays ES5-style for consistency.
+- **Single file, versioned**: everything stays in `public/index.html`; bump `<meta name="app-version">` (semver) on every change.
+- **The FoxESS signature uses literal `\r\n` characters** (escaped, not actual CRLF) in the MD5 hash — see `generateSignature()` in `src/lib/foxess.js`. This is the #1 way the integration breaks.
+- **Edge caching uses `caches.default` with synthetic Request URLs** (`https://cache.internal/key`) — cache keys must be unique per data type. (Unlike brisbane-dashboard, this repo does use `caches.default`.)
+- **Open-Meteo**: always `&timeformat=unixtime`, parse `new Date(ts * 1000)` — ISO strings without offset parse as UTC in some browsers.
+- **Discharge-cutoff state machine is subtle** — read the current logic in `index.html` before touching it: `forceDischargePeriods` defaults `{start: 18, end: 20}`; cutoff and the manual stop button only exist inside configured windows; manual/auto resume suppresses another cutoff for the current window until SoC rises above the auto threshold; optional `dischargeCutoffFirstHourThreshold` (0 = off) applies a higher stop SoC until `dischargeCutoffFinalStageHours` before the window end (default 1; 0.5–6 in 0.5 steps), tracked via a persisted phase key, auto-resuming at the final stage *without* setting resume suppression.
+- **Toolchain**: Wrangler 4 needs Node 22+ (matches the configured 2026 compatibility date).
 
-### iOS 12 Safari Compatibility (Frontend Only)
+## Offline / standalone
 
-`public/index.html` MUST work on iOS 12 Safari:
+`public/sw.js` prevents blank-screen-of-death for the iOS home-screen app: network-first with cached-HTML fallback and a styled offline page; precaches `/` on install; hooks `XMLHttpRequest.prototype.send` to show the red OFFLINE badge; `forceReload()` clears only non-SW caches so the offline fallback survives forced reloads.
 
-- **No arrow functions** — use `function() {}` everywhere
-- **No `let`/`const`** — use `var` only
-- **No template literals** — use string concatenation
-- **No `for...of` loops** — use indexed `for` loops
-- **No destructuring, spread, rest, optional chaining (`?.`), nullish coalescing (`??`)**
-- **No `Promise.allSettled`, `Object.entries`, `Array.flat`**
-- **Use `-webkit-` prefixes** for CSS where needed
-- **Use `XMLHttpRequest`** — not `fetch()`
+## Environment variables (Cloudflare dashboard)
 
-The Worker code (`src/`) runs on Cloudflare's V8 runtime and CAN use modern JS, but existing code uses ES5 style for consistency.
-
-### Single-File Frontend
-
-`public/index.html` is a single file containing all HTML, CSS, and JavaScript. Do not split it into separate files.
-
-### Version Bumping
-
-`public/index.html` has `<meta name="app-version" content="X.Y.Z">`. Bump this (semver) whenever changing index.html. The auto-update banner compares this against localStorage to notify users.
-
-## Offline / Standalone Support
-
-A service worker (`public/sw.js`) prevents blank-screen-of-death when the app is added to the iOS home screen and loses network:
-
-- **Network-first**: Tries network, falls back to cached HTML, last resort is a styled offline page with Retry button
-- **Precaches on install**: `cache.add('/')` during SW install event
-- **XHR offline indicator**: Hooks `XMLHttpRequest.prototype.send` to detect network failures and show a red "OFFLINE" badge next to the clock
-- **`forceReload()` preserves SW cache**: Only clears non-SW caches so offline fallback survives forced reloads
-
-## Common Gotchas
-
-- **FoxESS signature**: Uses literal `\r\n` characters (escaped, not actual CRLF) in the MD5 hash — see `generateSignature()` in `src/lib/foxess.js`
-- **Open-Meteo timestamps**: Always use `&timeformat=unixtime` and parse with `new Date(timestamp * 1000)` — ISO strings without timezone offset get parsed as UTC in some browsers
-- **Force discharge periods**: `forceDischargePeriods` defaults to `{start: 18, end: 20}`; automatic discharge cutoff and the manual stop button only appear inside configured windows, outside-window detection shows a warning indicator, and manual/auto resume suppresses another cutoff for the current window until SoC rises above the auto threshold
-- **Two-stage cutoff**: optional `dischargeCutoffFirstHourThreshold` (0 = off) applies a higher stop SoC until the final stage of the window (`dischargeCutoffFinalStageHours` before the end, default 1, 0.5–6 in 0.5 steps); a first-stage stop is tracked via a persisted phase key and auto-resumes at the start of the final stage (without setting resume suppression) so the normal auto threshold takes over
-- **DOM elements**: All cached in the `elements` object, initialized in `initializeElements()` — add new elements there
-- **User config**: Stored in the `config` object, persisted to `localStorage` via `loadSettings()`/`saveSettings()`
-- **Edge caching**: `cachedFetch()` uses `caches.default` with a synthetic Request URL (`https://cache.internal/key`) — cache keys must be unique per data type
-- **Toolchain**: Wrangler 4 requires Node.js 22+ and matches the configured 2026 compatibility date for local dev
-
-## Environment Variables (Cloudflare Dashboard)
-
-| Variable | Required | Description |
-|----------|----------|-------------|
-| `FOXESS_API_KEY` | Yes | FoxESS Cloud API key |
-| `FOXESS_DEVICE_SN` | Yes | Inverter serial number |
-| `API_KEY` | Yes | Dashboard authentication key |
-| `ALLOWED_ORIGIN` | No | CORS origin (default: `*`) |
-| `CACHE_TTL` | No | Cache seconds (default: `60`) |
-
-## API Routes
-
-All defined in `src/worker.js`:
-
-| Route | Auth | Description |
-|-------|------|-------------|
-| `GET /api/health` | No | Returns `{"status":"ok","timestamp":...}` |
-| `GET/POST /api/realtime` | Yes (`X-API-Key` header) | Real-time inverter data from FoxESS |
-| `GET/POST /api/report?type=day\|month\|year` | Yes (`X-API-Key` header) | Energy report data from FoxESS |
-| `GET /api/daily-generation?date=YYYY-MM-DD` | Yes (`X-API-Key` header) | Solar generation total for a date |
-| `GET /api/solar-forecast` | Yes (`X-API-Key` header) | Forecast.solar production forecast |
-| `GET /api/battery/scheduler` | Yes (`X-API-Key` header) | Current scheduler config from FoxESS (cached) |
-| `POST /api/battery/discharge-cutoff` | Yes (`X-API-Key` header) | Enable/disable scheduler for discharge cutoff actions |
-
-## Deployment
-
-- Worker name: `lucky-glade-17da`
-- URL: `https://lucky-glade-17da.zainulabedeen.workers.dev`
-
-## Workflow Rules
-
-- After making changes, ask the user before committing and pushing
-- Always bump the version in `index.html` when modifying it
-- Keep README.md, CLAUDE.md, AGENTS.md, and skills up to date when adding features or making structural changes
-- Run `/reflect` after completing significant features
+`FOXESS_API_KEY`, `FOXESS_DEVICE_SN`, `API_KEY` (dashboard auth — all routes except `/api/health` need the `X-API-Key` header) required; `ALLOWED_ORIGIN` (default `*`) and `CACHE_TTL` (default 60s) optional.
 
 ## External APIs
 
-- **FoxESS Cloud API**: `https://www.foxesscloud.com/op/v0/...` — requires MD5 signature auth (see `src/lib/foxess.js`)
-- **Open-Meteo**: `https://api.open-meteo.com/v1/forecast` — free weather API, no auth needed
+FoxESS Cloud (`https://www.foxesscloud.com/op/v0/...`, MD5 signature auth), Open-Meteo (free, no auth), Forecast.solar (production forecast).
+
+## Deployment and workflow
+
+Worker `lucky-glade-17da` at `https://lucky-glade-17da.zainulabedeen.workers.dev`. **Ask before committing and pushing.** Bump the version on `index.html` changes; keep README.md, CLAUDE.md, AGENTS.md, and skills in sync (run the `reflecting` skill after significant features).
+
+## Where to look
+
+| Task | Skill |
+|---|---|
+| New API route / worker feature | `.claude/skills/adding-backend-feature/SKILL.md` |
+| New UI feature | `.claude/skills/adding-frontend-feature/SKILL.md` |
+| Doc sync after changes | `.claude/skills/reflecting/SKILL.md` |

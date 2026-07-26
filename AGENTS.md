@@ -1,74 +1,45 @@
-# Agents Guide
+# FoxESS Battery Monitor Dashboard
 
-## Project Context
+Single Cloudflare Worker serving a static dashboard (`public/index.html`) and `/api/*` routes (`src/worker.js`) that proxy the FoxESS Cloud API. Monitors a hybrid inverter and battery in real time. Shared helpers (FoxESS signature, auth, CORS, caching) live in `src/lib/foxess.js`; routes are readable in `src/worker.js`.
 
-This is a Cloudflare Worker project that serves a single-page IoT monitoring dashboard and a JSON API. See @CLAUDE.md for full architecture details.
+## Commands
 
-## Build & Deploy
+```bash
+npm run setup      # interactive setup wizard
+npm run dev        # local dev at http://localhost:8787
+npm run deploy     # deploy (git push to master also auto-deploys)
+```
 
-- No build step required — deploy directly with `npx wrangler deploy`
-- Local dev: `npx wrangler dev` (serves from `public/` with Worker handling `/api/*`)
-- Git push to `master` auto-deploys via Cloudflare
+## Critical rules
 
-## Code Conventions
+- **`public/index.html` must run on iOS 12 Safari**: no arrow functions, `let`/`const`, template literals, `for...of`, destructuring/spread/`?.`/`??`, `Promise.allSettled`, `Object.entries`, `Array.flat`. Use `var`, `function() {}`, string concatenation, indexed loops, `XMLHttpRequest`, `-webkit-` prefixes. Worker code (`src/`) is modern V8 but stays ES5-style for consistency.
+- **Single file, versioned**: everything stays in `public/index.html`; bump `<meta name="app-version">` (semver) on every change.
+- **The FoxESS signature uses literal `\r\n` characters** (escaped, not actual CRLF) in the MD5 hash — see `generateSignature()` in `src/lib/foxess.js`. This is the #1 way the integration breaks.
+- **Edge caching uses `caches.default` with synthetic Request URLs** (`https://cache.internal/key`) — cache keys must be unique per data type. (Unlike brisbane-dashboard, this repo does use `caches.default`.)
+- **Open-Meteo**: always `&timeformat=unixtime`, parse `new Date(ts * 1000)` — ISO strings without offset parse as UTC in some browsers.
+- **Discharge-cutoff state machine is subtle** — read the current logic in `index.html` before touching it: `forceDischargePeriods` defaults `{start: 18, end: 20}`; cutoff and the manual stop button only exist inside configured windows; manual/auto resume suppresses another cutoff for the current window until SoC rises above the auto threshold; optional `dischargeCutoffFirstHourThreshold` (0 = off) applies a higher stop SoC until `dischargeCutoffFinalStageHours` before the window end (default 1; 0.5–6 in 0.5 steps), tracked via a persisted phase key, auto-resuming at the final stage *without* setting resume suppression.
+- **Toolchain**: Wrangler 4 needs Node 22+ (matches the configured 2026 compatibility date).
 
-### Frontend (`public/index.html`)
+## Offline / standalone
 
-- Single-file app: all HTML, CSS, JS in one file
-- **ES5 JavaScript only** — iOS 12 Safari compatibility required
-- No arrow functions, no let/const, no template literals, no destructuring
-- Use `var`, `function() {}`, string concatenation, indexed `for` loops
-- Use `-webkit-` CSS prefixes where needed
-- DOM elements cached in an `elements` object, initialized in `initializeElements()`
-- Config stored in `config` object, persisted to `localStorage`
-- XHR used instead of `fetch()` for iOS 12 compatibility
+`public/sw.js` prevents blank-screen-of-death for the iOS home-screen app: network-first with cached-HTML fallback and a styled offline page; precaches `/` on install; hooks `XMLHttpRequest.prototype.send` to show the red OFFLINE badge; `forceReload()` clears only non-SW caches so the offline fallback survives forced reloads.
 
-### Backend (`src/worker.js`, `src/lib/foxess.js`)
+## Environment variables (Cloudflare dashboard)
 
-- Cloudflare Workers module format: `export default { async fetch(request, env) {} }`
-- Route matching via `url.pathname` string comparison in worker.js
-- Shared helpers in `src/lib/foxess.js` — imported by worker.js
-- CORS handled globally in worker.js (not per-route)
-- Auth via `X-API-Key` header validated against `env.API_KEY`
-- Edge caching via `caches.default` with configurable TTL
+`FOXESS_API_KEY`, `FOXESS_DEVICE_SN`, `API_KEY` (dashboard auth — all routes except `/api/health` need the `X-API-Key` header) required; `ALLOWED_ORIGIN` (default `*`) and `CACHE_TTL` (default 60s) optional.
 
-## Commit Guidelines
+## External APIs
 
-- Always ask the user before committing and pushing
-- Use concise commit messages focused on the "why"
-- Add `Co-Authored-By: Claude Opus 4.5 <noreply@anthropic.com>` to commits
-- Bump `<meta name="app-version">` in index.html when modifying it (semver)
-- Commit specific files, not `git add -A`
+FoxESS Cloud (`https://www.foxesscloud.com/op/v0/...`, MD5 signature auth), Open-Meteo (free, no auth), Forecast.solar (production forecast).
 
-## Adding Features
+## Deployment and workflow
 
-### New API endpoint
-1. Add route handler in `src/worker.js` (follow existing pattern)
-2. Add shared logic to `src/lib/foxess.js` if reusable
-3. Update the API Routes table in README.md and CLAUDE.md
+Worker `lucky-glade-17da` at `https://lucky-glade-17da.zainulabedeen.workers.dev`. **Ask before committing and pushing.** Bump the version on `index.html` changes; keep README.md, AGENTS.md, CLAUDE.md, and skills in sync (run the `reflecting` skill after significant features).
 
-### New dashboard UI element
-1. Add HTML in the appropriate section of `public/index.html`
-2. Add CSS in the `<style>` block
-3. Add JS logic — cache DOM element in `initializeElements()`, add to `elements` object
-4. Bump the `app-version` meta tag
-5. All JS must be ES5-compatible (no modern syntax)
+## Where to look
 
-### New weather data
-- Open-Meteo API: add parameters to the existing URL in `fetchWeather()`
-- Always use `&timeformat=unixtime` for time values to avoid timezone issues
-- Parse with `new Date(timestamp * 1000)` for Unix timestamps
-
-## Security
-
-- Never commit `.env` files or secrets
-- API keys are Cloudflare environment variables, not in code
-- Validate auth on all endpoints except `/api/health`
-- CORS origin configurable via `ALLOWED_ORIGIN` env var
-
-## Documentation
-
-Keep these files updated after structural changes:
-- `README.md` — user-facing setup and usage
-- `CLAUDE.md` — AI assistant project context
-- `.claude/skills/` — skill instructions
+| Task | Skill |
+|---|---|
+| New API route / worker feature | `.agents/skills/adding-backend-feature/SKILL.md` |
+| New UI feature | `.agents/skills/adding-frontend-feature/SKILL.md` |
+| Doc sync after changes | `.agents/skills/reflecting/SKILL.md` |

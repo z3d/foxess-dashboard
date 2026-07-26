@@ -7,72 +7,22 @@ argument-hint: "[e.g. 'add battery history endpoint' or 'add rate limiting']"
 
 # Adding a Backend Feature
 
-You are adding a new API endpoint or backend capability to the FoxESS Cloudflare Worker.
+`src/worker.js` is the single entry point, routing by `url.pathname` through an `if/else if` chain; non-`/api/*` requests fall through to static assets via `env.ASSETS.fetch(request)`. Shared helpers live in `src/lib/foxess.js` — read a neighbouring route before adding one; the local pattern is the spec.
 
-## Before Starting
+## The rules
 
-1. Read `src/worker.js` to understand the routing pattern
-2. Read `src/lib/foxess.js` to understand shared helpers
-3. Read `wrangler.jsonc` for Worker configuration
+- **Auth**: every endpoint except `/api/health` calls `validateApiKey(request, env)` and returns a JSON 401 on failure.
+- **CORS is handled once** at the end of the fetch handler — no per-route CORS.
+- **Cache external-API calls** through `cachedFetch('unique-cache-key', fn, ttl)` with `var ttl = parseInt(env.CACHE_TTL) || 60`. Keys are synthetic Request URLs, so they must be unique per data type.
+- **FoxESS calls**: `createFoxESSHeaders(path, env.FOXESS_API_KEY)`, base `https://www.foxesscloud.com`, POST JSON with `sn: env.FOXESS_DEVICE_SN`. The signature uses **literal `\r\n`** (escaped, not CRLF) — see `generateSignature()`.
+- **Reusable logic goes in `src/lib/foxess.js`** as an export, added to the existing import in `worker.js`.
+- **New env vars**: add in the Cloudflare dashboard (Settings → Variables and Secrets), read via `env.NAME`, and document in the README and AGENTS.md tables.
 
-## Architecture
+## After implementing
 
-- `src/worker.js` — single entry point, routes requests by `url.pathname`
-- `src/lib/foxess.js` — shared helpers (FoxESS API calls, auth, CORS, caching)
-- Static assets from `public/` served via `env.ASSETS.fetch(request)`
-- All `/api/*` routes handled by the Worker; everything else falls through to static assets
+Test with `npx wrangler dev` where possible, update the API-route tables in README.md, **ask before committing/pushing**, and run the `reflecting` skill if the change is significant.
 
-## Adding a New API Endpoint
+## Related skills
 
-1. **Add route** in `src/worker.js` following the existing `if/else if` pattern:
-   ```javascript
-   } else if (path === '/api/your-endpoint') {
-     if (!validateApiKey(request, env)) {
-       response = new Response(JSON.stringify({ error: 'Unauthorized' }), {
-         status: 401, headers: { 'Content-Type': 'application/json' }
-       });
-     } else {
-       // Your logic here
-       response = new Response(JSON.stringify(data), {
-         headers: { 'Content-Type': 'application/json' }
-       });
-     }
-   ```
-
-2. **Add shared helpers** to `src/lib/foxess.js` if reusable:
-   - Export the function: `export async function yourHelper(env) { ... }`
-   - Import in worker.js: add to the existing import statement
-
-3. **Use caching** if calling an external API:
-   ```javascript
-   var ttl = parseInt(env.CACHE_TTL) || 60;
-   var cached = await cachedFetch('unique-cache-key', function() {
-     return yourFetchFunction(env);
-   }, ttl);
-   ```
-
-4. **Auth**: Use `validateApiKey(request, env)` for protected endpoints. Only `/api/health` is public.
-
-5. **CORS**: Handled automatically at the end of the fetch handler — no per-route CORS needed.
-
-## FoxESS API Integration
-
-When calling a new FoxESS endpoint:
-1. Use `createFoxESSHeaders(path, env.FOXESS_API_KEY)` for auth headers
-2. Base URL: `https://www.foxesscloud.com`
-3. POST with JSON body, include `sn: env.FOXESS_DEVICE_SN`
-4. Signature uses literal `\r\n` (escaped, not actual CRLF) — see `generateSignature()`
-
-## Adding Environment Variables
-
-1. Add in Cloudflare Dashboard (Settings > Variables and Secrets)
-2. Access via `env.VARIABLE_NAME` in Worker code
-3. Document in README.md and AGENTS.md environment variables tables
-
-## After Implementation
-
-1. Test locally with `npx wrangler dev` if possible
-2. Update API Routes tables in README.md and AGENTS.md
-3. Ask the user if they want to commit and push
-4. If committing, use a concise message with `Co-Authored-By: Codex Opus 4.5 <noreply@anthropic.com>`
-5. Run `/reflect` to update documentation
+- `adding-frontend-feature` — the UI consuming the new route
+- `reflecting` — doc sync afterwards

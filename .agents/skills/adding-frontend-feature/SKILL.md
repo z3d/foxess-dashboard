@@ -7,50 +7,30 @@ argument-hint: "[e.g. 'add battery health panel' or 'dark mode toggle']"
 
 # Adding a Frontend Feature
 
-You are adding a new feature to the FoxESS Battery Monitor dashboard. The entire frontend is a single file: `public/index.html`.
+The entire frontend is one file: `public/index.html`. Read the section you're extending first — the existing structure is the spec. The iOS 12 constraints in `AGENTS.md` are mandatory for every line of JS you add.
 
-## Before Starting
+## The rules
 
-1. Read `public/index.html` to understand the current structure
-2. Identify where the new feature fits (header, stats grid, weather panel, settings, etc.)
-3. Plan the changes needed: HTML, CSS, and JS
+- **DOM elements** get cached in `initializeElements()` and added to the `elements` object.
+- **User config** lives in the `config` object, persisted to localStorage; a new settings toggle must be wired in three places — the settings panel HTML, `loadSettings()`, and `saveSettings()`.
+- **External data** fetches use `XMLHttpRequest` with `onreadystatechange`; Open-Meteo time data uses `&timeformat=unixtime` + `new Date(ts * 1000)`.
+- **CSS follows the existing theme**: background `#1a1a2e`, cards `#16213e`, text `#e0e0e0`; accents green `#4ade80`, blue `#60a5fa`, yellow `#fbbf24`; existing class naming.
+- **Bump `<meta name="app-version">`** (semver) as part of the change, not after.
 
-## iOS 12 Compatibility (MANDATORY)
+## Validation before finishing
 
-All JavaScript in `public/index.html` MUST work on iOS 12 Safari:
+Grep the diff for iOS 12 breakers — each of these has shipped a blank screen before:
 
-- Use `var` — never `let` or `const`
-- Use `function() {}` — never arrow functions `() => {}`
-- Use string concatenation — never template literals
-- Use indexed `for` loops — never `for...of`
-- Use `XMLHttpRequest` — never `fetch()`
-- No destructuring, spread, rest, optional chaining, nullish coalescing
+```
+=>                      # arrow functions
+\blet\b  \bconst\b      # in JS, not CSS
+`                       # template literals
+for.*of
+```
 
-## Implementation Steps
+Then **ask before committing/pushing**, and run `reflecting` if the change is significant.
 
-1. **Add HTML** in the appropriate section of the file
-2. **Add CSS** in the `<style>` block, following existing patterns:
-   - Dark theme: background `#1a1a2e`, cards `#16213e`, text `#e0e0e0`
-   - Accent colors: green `#4ade80`, blue `#60a5fa`, yellow `#fbbf24`
-   - Use existing class naming conventions
-3. **Add JavaScript**:
-   - Cache new DOM elements in `initializeElements()` and add to the `elements` object
-   - Store any user config in the `config` object (persisted to localStorage)
-   - If adding a settings toggle, add it to the settings panel HTML, `loadSettings()`, and `saveSettings()`
-   - If fetching external data, use `XMLHttpRequest` with `onreadystatechange`
-   - If using Open-Meteo time data, use `&timeformat=unixtime` and `new Date(timestamp * 1000)`
-4. **Bump version**: Update `<meta name="app-version" content="X.Y.Z">` (semver)
+## Related skills
 
-## Validation Checklist
-
-Before finishing, grep for these patterns that would break iOS 12:
-- Arrow functions: `=>`
-- Let/const: `\blet\b`, `\bconst\b` (in JS, not CSS)
-- Template literals: backtick characters
-- For...of: `for.*of`
-
-## After Implementation
-
-1. Ask the user if they want to commit and push
-2. If committing, use a concise message with `Co-Authored-By: Codex Opus 4.5 <noreply@anthropic.com>`
-3. Run `/reflect` to update documentation if the change is significant
+- `adding-backend-feature` — the route feeding the new UI
+- `reflecting` — doc sync afterwards
